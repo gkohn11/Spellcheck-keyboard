@@ -29,12 +29,10 @@ Feature it doesn't have and probably will never have:
 
 ## Downloads
 
-[<img src="https://f-droid.org/badge/get-it-on.png"
-      alt="Get it on F-Droid"
-      height="80">](https://f-droid.org/packages/rkr.simplekeyboard.inputmethod/)
-[<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
-      alt="Get it on Google Play"
-      height="80">](https://play.google.com/store/apps/details?id=rkr.simplekeyboard.inputmethod)
+Spellcheck Keyboard is available on:
+- **Google Play**: Coming soon
+- **F-Droid**: Coming soon
+- **GitHub Releases**: https://github.com/gkohn11/Spellcheck-keyboard/releases
 
 ## License
 
@@ -50,6 +48,9 @@ https://android.googlesource.com/platform/packages/inputmethods/LatinIME/
 ## Credits
 
 **Spellcheck Keyboard** is a derivative work that extends Simple Keyboard with text replacement and spellcheck functionality.
+
+**Fork Maintainer:**
+- Gavin Kohn (Text replacement and spellcheck features)
 
 **Original Contributors:**
 - The Android Open Source Project (AOSP LatinIME)
