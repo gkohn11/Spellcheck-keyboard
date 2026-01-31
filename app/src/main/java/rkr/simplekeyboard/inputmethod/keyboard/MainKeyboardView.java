@@ -228,6 +228,18 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         PointerTracker.setKeyboardActionListener(listener);
     }
 
+    /**
+     * Get the text color used on keyboard keys
+     * @return the text color, or 0 if not available
+     */
+    public int getKeyTextColor() {
+        final KeyDrawParams drawParams = getKeyDrawParams();
+        if (drawParams != null && drawParams.mTextColor != 0) {
+            return drawParams.mTextColor;
+        }
+        return 0;
+    }
+
     // TODO: We should reconsider which coordinate system should be used to represent keyboard
     // event.
     public int getKeyX(final int x) {

@@ -43,6 +43,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
+import android.widget.FrameLayout;
 import android.view.Window;
 import android.view.WindowInsetsController;
 import android.view.inputmethod.EditorInfo;
@@ -61,12 +62,17 @@ import rkr.simplekeyboard.inputmethod.keyboard.KeyboardActionListener;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardId;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardSwitcher;
 import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
+import rkr.simplekeyboard.inputmethod.keyboard.internal.KeyDrawParams;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
+import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
+import rkr.simplekeyboard.inputmethod.latin.settings.TextReplacementCsvManager;
+import rkr.simplekeyboard.inputmethod.latin.settings.TextReplacementEntry;
+import rkr.simplekeyboard.inputmethod.latin.settings.TextReplacementManager;
 import rkr.simplekeyboard.inputmethod.latin.utils.ApplicationUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.LeakGuardHandlerWrapper;
 import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
@@ -91,6 +97,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     // TODO: Move these {@link View}s to {@link KeyboardSwitcher}.
     private View mInputView;
+    private TextReplacementSuggestionBar mSuggestionBar;
 
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
@@ -268,6 +275,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final IntentFilter filter = new IntentFilter();
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         registerReceiver(mRingerModeChangeReceiver, filter);
+
+        // Initialize text replacement manager
+        TextReplacementManager.getInstance(this).initialize();
     }
 
     private void loadSettings() {
@@ -295,7 +305,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public boolean onEvaluateInputViewShown() {
         final boolean useOnScreen = super.onEvaluateInputViewShown();
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+        if (Build.VERSION.SDK_INT < 35) { // BAKLAVA (API 35)
             return useOnScreen;
         } else {
             return useOnScreen || mSettings.getCurrent().mUseOnScreen;
@@ -327,13 +337,133 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void setInputView(final View view) {
         super.setInputView(view);
         mInputView = view;
+        if (view != null) {
+            // Find suggestion bar in input view
+            mSuggestionBar = view.findViewById(R.id.suggestion_bar);
+            final MainKeyboardView keyboardView = mKeyboardSwitcher.getMainKeyboardView();
+            
+            if (mSuggestionBar != null) {
+                updateSuggestionBarColor();
+                mSuggestionBar.setOnSuggestionClickListener(new TextReplacementSuggestionBar.OnSuggestionClickListener() {
+                    @Override
+                    public void onOriginalWordClicked() {
+                        // User clicked the incorrect word - just add a space
+                        handleOriginalWordClick();
+                    }
+                    
+                    @Override
+                    public void onCorrectionClicked(String suggestion) {
+                        // User clicked the correct word - replace the incorrect word
+                        handleSuggestionClick(suggestion);
+                    }
+                });
+                
+                // Handle CSV input from the suggestion bar
+                mSuggestionBar.setOnCsvInputListener(new TextReplacementSuggestionBar.OnCsvInputListener() {
+                    @Override
+                    public void onCsvInput(String csvLine) {
+                        handleCsvInput(csvLine);
+                    }
+                });
+                
+                // Position suggestion bar above keyboard
+                
+                // Position suggestion bar above keyboard
+                if (keyboardView != null) {
+                    keyboardView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            positionSuggestionBarAboveKeyboard(keyboardView);
+                        }
+                    });
+                }
+                
+            }
+            view.requestApplyInsets();
+        }
         updateSoftInputWindowLayoutParameters();
-        view.requestApplyInsets();
+    }
+    
+    /**
+     * Position suggestion bar just above the keyboard
+     */
+    private void positionSuggestionBarAboveKeyboard(MainKeyboardView keyboardView) {
+        if (mSuggestionBar == null || mInputView == null) {
+            return;
+        }
+        
+        // Use visible keyboard view to get total height including number row if shown
+        final View visibleKeyboardView = mKeyboardSwitcher.getVisibleKeyboardView();
+        if (visibleKeyboardView == null) {
+            return;
+        }
+        
+        // Get the total visible keyboard height (includes all rows)
+        int keyboardHeight = visibleKeyboardView.getHeight();
+        if (keyboardHeight == 0 && keyboardView != null) {
+            // Fallback to main keyboard view if visible view not measured yet
+            keyboardHeight = keyboardView.getHeight();
+        }
+        
+        if (keyboardHeight > 0) {
+            // Set margin bottom to position it above keyboard using FrameLayout.LayoutParams
+            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) mSuggestionBar.getLayoutParams();
+            if (params != null) {
+                params.bottomMargin = keyboardHeight;
+                params.gravity = Gravity.BOTTOM;
+                mSuggestionBar.setLayoutParams(params);
+            }
+        }
+    }
+    
+    /**
+     * Update suggestion bar color to match keyboard theme
+     */
+    private void updateSuggestionBarColor() {
+        if (mSuggestionBar != null && mSuggestionBar.mOriginalWordText != null && mSuggestionBar.mCorrectionText != null) {
+            final SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(this);
+            final int keyboardColor = Settings.readKeyboardColor(prefs, this);
+            mSuggestionBar.setBackgroundColor(keyboardColor);
+            
+            // Get text color from keyboard theme to match key text color
+            int textColor = getKeyboardTextColor();
+            if (textColor == 0) {
+                // Fallback: use white text on dark backgrounds, black on light
+                boolean isDark = android.graphics.Color.red(keyboardColor) + 
+                                android.graphics.Color.green(keyboardColor) + 
+                                android.graphics.Color.blue(keyboardColor) < 384;
+                textColor = isDark ? 0xFFFFFFFF : 0xFF000000;
+            }
+            mSuggestionBar.mOriginalWordText.setTextColor(textColor);
+            mSuggestionBar.mCorrectionText.setTextColor(textColor);
+            
+            // Force the text to be visible
+            mSuggestionBar.mOriginalWordText.setVisibility(android.view.View.VISIBLE);
+            mSuggestionBar.mCorrectionText.setVisibility(android.view.View.VISIBLE);
+        }
+    }
+    
+    /**
+     * Get the text color used on keyboard keys from the current keyboard view
+     */
+    private int getKeyboardTextColor() {
+        final MainKeyboardView keyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (keyboardView != null) {
+            return keyboardView.getKeyTextColor();
+        }
+        return 0;
+    }
+
+    @Override
+    public View onCreateCandidatesView() {
+        // Don't use candidate view - suggestion bar is now in input view
+        return null;
     }
 
     @Override
     public void setCandidatesView(final View view) {
-        // To ensure that CandidatesView will never be set.
+        // Don't set candidate view - suggestion bar is now in input view
+        super.setCandidatesView(null);
     }
 
     @Override
@@ -448,10 +578,22 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         if (isDifferentTextField) {
             mainKeyboardView.closing();
+            
+            // Update suggestion bar color when keyboard loads
+            updateSuggestionBarColor();
             currentSettingsValues = mSettings.getCurrent();
 
             switcher.loadKeyboard(editorInfo, currentSettingsValues, getCurrentAutoCapsState(),
                     getCurrentRecapitalizeState());
+            // Update suggestion bar position after keyboard loads
+            if (mSuggestionBar != null) {
+                mainKeyboardView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        positionSuggestionBarAboveKeyboard(mainKeyboardView);
+                    }
+                });
+            }
         } else {
             // TODO: Come up with a more comprehensive way to reset the keyboard layout when
             // a keyboard layout set doesn't get reloaded in this method.
@@ -548,7 +690,21 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             outInsets.visibleTopInsets = inputHeight;
             return;
         }
-        final int visibleTopY = inputHeight - visibleKeyboardView.getHeight();
+        
+        // Calculate suggestion bar height to account for it in insets
+        int suggestionBarHeight = 0;
+        if (mSuggestionBar != null && mSuggestionBar.getVisibility() == android.view.View.VISIBLE) {
+            suggestionBarHeight = mSuggestionBar.getHeight();
+            if (suggestionBarHeight == 0) {
+                // If height not measured yet, use a reasonable default
+                mSuggestionBar.measure(android.view.View.MeasureSpec.makeMeasureSpec(
+                    mInputView.getWidth(), android.view.View.MeasureSpec.EXACTLY),
+                    android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED));
+                suggestionBarHeight = mSuggestionBar.getMeasuredHeight();
+            }
+        }
+        
+        final int visibleTopY = inputHeight - visibleKeyboardView.getHeight() - suggestionBarHeight;
         // Need to set expanded touchable region only if a keyboard view is being shown.
         if (visibleKeyboardView.isShown()) {
             final int touchLeft = 0;
@@ -560,6 +716,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
             outInsets.touchableRegion.set(touchLeft, touchTop, touchRight, touchBottom);
         }
+        // Add suggestion bar height to insets so text input area is pushed up
         outInsets.contentTopInsets = visibleTopY;
         outInsets.visibleTopInsets = visibleTopY;
     }
@@ -729,6 +886,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onCodeInput(final int codePoint, final int x, final int y,
             final boolean isKeyRepeat) {
+        // Check if the suggestion bar's EditText is focused - if so, route input there
+        if (mSuggestionBar != null && mSuggestionBar.isCorrectionTextFocused()) {
+            handleInputToSuggestionBar(codePoint);
+            return;
+        }
+        
         final Event event = createSoftwareKeypressEvent(getCodePointForKeyboard(codePoint), isKeyRepeat);
         onEvent(event);
     }
@@ -740,6 +903,407 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 mInputLogic.onCodeInput(mSettings.getCurrent(), event);
         updateStateAfterInputTransaction(completeInputTransaction);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
+    /**
+     * Handle click on original word - just add a space and leave the word as is
+     */
+    private void handleOriginalWordClick() {
+        if (mInputLogic == null || mInputLogic.mConnection == null) {
+            return;
+        }
+        
+        // Simply commit a space
+        mInputLogic.mConnection.beginBatchEdit();
+        mInputLogic.mConnection.commitText(" ", 1);
+        mInputLogic.mConnection.endBatchEdit();
+        
+        // Hide suggestion bar
+        if (mSuggestionBar != null) {
+            mSuggestionBar.hideSuggestion();
+        }
+    }
+
+    /**
+     * Handle suggestion bar click - replace the misspelled word with the correct spelling
+     */
+    private void handleSuggestionClick(String suggestion) {
+        if (suggestion == null || suggestion.isEmpty()) {
+            return;
+        }
+        
+        // Reload text cache to ensure we have the latest text
+        mInputLogic.mConnection.reloadTextCache();
+        
+        TextReplacementManager manager = TextReplacementManager.getInstance(this);
+        String textBeforeCursor = mInputLogic.mConnection.getTextBeforeCursor();
+        // Determine if the last typed separator was a space (vs punctuation)
+        boolean endsWithSpace = textBeforeCursor != null
+                && textBeforeCursor.length() > 0
+                && textBeforeCursor.charAt(textBeforeCursor.length() - 1) == ' ';
+        
+        // Extract word with punctuation (period, comma, exclamation)
+        String[] wordWithPunctuation = TextReplacementManager.extractLastWordWithPunctuation(textBeforeCursor);
+        if (wordWithPunctuation == null) {
+            return;
+        }
+        
+        String lastWord = wordWithPunctuation[0];
+        String punctuation = wordWithPunctuation[1];
+        
+        if (lastWord != null && manager.getReplacement(lastWord) != null) {
+            // The suggestion may already include punctuation (from showSuggestion)
+            // Extract just the word part if punctuation is present
+            String suggestionWord = suggestion;
+            if (suggestion.length() > 0 && !punctuation.isEmpty()) {
+                // Check if suggestion ends with the same punctuation
+                if (suggestion.endsWith(punctuation)) {
+                    // Remove punctuation from suggestion to get just the word
+                    suggestionWord = suggestion.substring(0, suggestion.length() - punctuation.length());
+                }
+            }
+            
+            // Apply case matching to the suggestion word
+            String caseMatchedSuggestion = applyCaseMatching(lastWord, suggestionWord);
+            
+            // Delete the word and punctuation, replace with correct spelling
+            int wordLength = lastWord.length();
+            int punctuationLength = punctuation.length();
+            
+            // Find the word in the text to get its exact position
+            // Search backwards from the end for the word
+            int wordStartPos = -1;
+            String lowerText = textBeforeCursor.toLowerCase();
+            String lowerWord = lastWord.toLowerCase();
+            
+            // Find the last occurrence of the word
+            for (int i = lowerText.length() - lowerWord.length() - punctuationLength; i >= 0; i--) {
+                if (i + lowerWord.length() <= lowerText.length() && 
+                    lowerText.substring(i, i + lowerWord.length()).equals(lowerWord)) {
+                    // Check if it's a complete word (not part of another word)
+                    boolean isWordStart = (i == 0 || !Character.isLetterOrDigit(textBeforeCursor.charAt(i - 1)));
+                    boolean isWordEnd = (i + lowerWord.length() >= textBeforeCursor.length() || 
+                                        !Character.isLetterOrDigit(textBeforeCursor.charAt(i + lowerWord.length())));
+                    if (isWordStart && isWordEnd) {
+                        wordStartPos = i;
+                        break;
+                    }
+                }
+            }
+            
+            mInputLogic.mConnection.beginBatchEdit();
+            
+            if (wordStartPos >= 0) {
+                // Calculate how many characters to delete from cursor position
+                // Need to delete: word + punctuation + any characters between cursor and word end
+                int totalLength = wordLength + punctuationLength;
+                int charsFromEnd = textBeforeCursor.length() - wordStartPos - totalLength;
+                // First delete any characters between cursor and word end
+                for (int i = 0; i < charsFromEnd; i++) {
+                    mInputLogic.mConnection.deleteTextBeforeCursor(1);
+                }
+                // Then delete the word and punctuation
+                for (int i = 0; i < totalLength; i++) {
+                    mInputLogic.mConnection.deleteTextBeforeCursor(1);
+                }
+            } else {
+                // Fallback: just delete the word length + punctuation
+                for (int i = 0; i < wordLength + punctuationLength; i++) {
+                    mInputLogic.mConnection.deleteTextBeforeCursor(1);
+                }
+            }
+            
+            // Commit the corrected word + punctuation + space (only add punctuation once)
+            mInputLogic.mConnection.commitText(caseMatchedSuggestion + punctuation + " ", 1);
+            mInputLogic.mConnection.endBatchEdit();
+            
+            // Hide suggestion bar
+            if (mSuggestionBar != null) {
+                mSuggestionBar.hideSuggestion();
+            }
+        }
+    }
+
+    /**
+     * Handle keyboard input when the suggestion bar's EditText is focused
+     */
+    private void handleInputToSuggestionBar(int codePoint) {
+        if (mSuggestionBar == null) {
+            return;
+        }
+        
+        android.widget.EditText editText = mSuggestionBar.getCorrectionEditText();
+        if (editText == null) {
+            return;
+        }
+        
+        // Handle special keys
+        if (codePoint == Constants.CODE_ENTER) {
+            // Process CSV and return focus to app's text field
+            String csvInput = editText.getText().toString().trim();
+            if (!csvInput.isEmpty()) {
+                // Process the CSV input
+                handleCsvInput(csvInput);
+                // Clear the EditText after processing
+                editText.setText("");
+            }
+            // Return focus to app's text field
+            editText.clearFocus();
+            return;
+        } else if (codePoint == Constants.CODE_DELETE) {
+            // Handle backspace
+            int start = editText.getSelectionStart();
+            int end = editText.getSelectionEnd();
+            if (start == end && start > 0) {
+                editText.getText().delete(start - 1, start);
+            } else if (start != end) {
+                editText.getText().delete(Math.min(start, end), Math.max(start, end));
+            }
+            return;
+        }
+        
+        // Handle regular character input
+        if (codePoint >= 0 && Character.isValidCodePoint(codePoint)) {
+            int start = editText.getSelectionStart();
+            int end = editText.getSelectionEnd();
+            if (start < 0) start = editText.getText().length();
+            if (end < 0) end = start;
+            
+            String charToInsert = new String(Character.toChars(codePoint));
+            editText.getText().replace(Math.min(start, end), Math.max(start, end), charToInsert, 0, charToInsert.length());
+            // Move cursor to end of inserted text
+            editText.setSelection(start + charToInsert.length());
+        }
+    }
+    
+    /**
+     * Handle CSV input from the suggestion bar - add new text replacement entry
+     */
+    private void handleCsvInput(String csvLine) {
+        if (csvLine == null || csvLine.trim().isEmpty()) {
+            return;
+        }
+        
+        try {
+            // Parse CSV line: misspell,correct,alwaysOn
+            // If only two parts provided (misspell,correct), default alwaysOn to false
+            String trimmed = csvLine.trim();
+            String[] parts = trimmed.split(",", -1); // -1 to include empty trailing parts
+            
+            TextReplacementEntry entry;
+            if (parts.length >= 2) {
+                String misspell = parts[0].trim();
+                String correct = parts[1].trim();
+                boolean alwaysOn = false;
+                
+                // If third part exists, parse it
+                if (parts.length >= 3 && !parts[2].trim().isEmpty()) {
+                    alwaysOn = "true".equalsIgnoreCase(parts[2].trim());
+                }
+                
+                entry = new TextReplacementEntry(misspell, correct, alwaysOn);
+            } else {
+                // Try standard CSV parsing
+                entry = TextReplacementEntry.fromCsv(trimmed);
+            }
+            
+            // Validate entry has at least a misspell value
+            if (entry.getMisspell() == null || entry.getMisspell().trim().isEmpty()) {
+                return;
+            }
+            
+            // Load existing entries
+            java.util.List<TextReplacementEntry> entries = TextReplacementCsvManager.loadCsvFromStorage(this);
+            
+            // Check if entry already exists (by misspell)
+            boolean found = false;
+            for (int i = 0; i < entries.size(); i++) {
+                if (entries.get(i).getMisspell().equalsIgnoreCase(entry.getMisspell())) {
+                    // Update existing entry
+                    entries.set(i, entry);
+                    found = true;
+                    break;
+                }
+            }
+            
+            // Add new entry if not found - add at the top
+            if (!found) {
+                entries.add(0, entry);
+            }
+            
+            // Save to CSV
+            TextReplacementCsvManager.saveCsvToStorage(this, entries);
+            
+            // Reload the text replacement manager so changes take effect immediately
+            TextReplacementManager.getInstance(this).reload();
+            
+            // Clear the suggestion bar input
+            if (mSuggestionBar != null) {
+                mSuggestionBar.hideSuggestion();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to handle CSV input", e);
+        }
+    }
+    
+    /**
+     * Apply case matching to preserve capitalization pattern of original word
+     * @param original The original word (e.g., "Teh", "TEH", "teh")
+     * @param replacement The replacement word (e.g., "the")
+     * @return The replacement with case matching (e.g., "The", "THE", "the")
+     */
+    private String applyCaseMatching(String original, String replacement) {
+        if (original == null || replacement == null || original.isEmpty() || replacement.isEmpty()) {
+            return replacement;
+        }
+        
+        // Check if all letters are uppercase
+        boolean allUpper = true;
+        boolean firstUpper = false;
+        for (int i = 0; i < original.length(); i++) {
+            char c = original.charAt(i);
+            if (Character.isLetter(c)) {
+                if (Character.isLowerCase(c)) {
+                    allUpper = false;
+                }
+                if (i == 0 && Character.isUpperCase(c)) {
+                    firstUpper = true;
+                }
+            }
+        }
+        
+        // Apply case pattern
+        if (allUpper && original.length() > 0) {
+            // All uppercase: "TEH" -> "THE"
+            return replacement.toUpperCase();
+        } else if (firstUpper) {
+            // First letter uppercase: "Teh" -> "The"
+            if (replacement.length() > 0) {
+                return Character.toUpperCase(replacement.charAt(0)) + 
+                       (replacement.length() > 1 ? replacement.substring(1).toLowerCase() : "");
+            }
+        }
+        // Otherwise lowercase: "teh" -> "the"
+        return replacement.toLowerCase();
+    }
+
+    /**
+     * Check for text replacement suggestions after text input
+     * @param isSeparatorEvent true if this is called after a separator (space, etc.), false if after a character
+     */
+    public void checkTextReplacement(boolean isSeparatorEvent) {
+        if (mSuggestionBar == null) {
+            return;
+        }
+        
+        // Check if text replacement is enabled in settings
+        if (mSettings != null && mSettings.getCurrent() != null) {
+            if (!mSettings.getCurrent().mTextReplacementEnabled) {
+                // Text replacement is disabled - completely hide banner and return
+                mSuggestionBar.hideBanner();
+                return;
+            }
+        }
+        
+        TextReplacementManager manager = TextReplacementManager.getInstance(this);
+        String textBeforeCursor = mInputLogic.mConnection.getTextBeforeCursor();
+        // Determine if the last character before the cursor is a space
+        final boolean endsWithSpace = textBeforeCursor != null
+                && textBeforeCursor.length() > 0
+                && textBeforeCursor.charAt(textBeforeCursor.length() - 1) == ' ';
+        
+        // Extract word with punctuation (period, comma, exclamation)
+        String[] wordWithPunctuation = TextReplacementManager.extractLastWordWithPunctuation(textBeforeCursor);
+        if (wordWithPunctuation == null) {
+            mSuggestionBar.hideSuggestion();
+            return;
+        }
+        
+        String lastWord = wordWithPunctuation[0];
+        String punctuation = wordWithPunctuation[1];
+        
+        // Always show the current word in the left column
+        String replacement = manager.getReplacement(lastWord);
+        if (replacement != null && !replacement.isEmpty()) {
+            // Apply case matching
+            String caseMatchedReplacement = applyCaseMatching(lastWord, replacement);
+            boolean isAlwaysOn = manager.isAlwaysOn(lastWord);
+            
+            // Only auto-replace when the separator is a space (not punctuation)
+            if (isAlwaysOn && isSeparatorEvent && endsWithSpace) {
+                // Auto-replace - find word position and delete correctly (including punctuation)
+                int wordLength = lastWord.length();
+                int punctuationLength = punctuation.length();
+                String lowerText = textBeforeCursor.toLowerCase();
+                String lowerWord = lastWord.toLowerCase();
+                
+                // Find the last occurrence of the word
+                int wordStartPos = -1;
+                for (int i = lowerText.length() - lowerWord.length() - punctuationLength; i >= 0; i--) {
+                    if (i + lowerWord.length() <= lowerText.length() && 
+                        lowerText.substring(i, i + lowerWord.length()).equals(lowerWord)) {
+                        boolean isWordStart = (i == 0 || !Character.isLetterOrDigit(textBeforeCursor.charAt(i - 1)));
+                        boolean isWordEnd = (i + lowerWord.length() >= textBeforeCursor.length() || 
+                                            !Character.isLetterOrDigit(textBeforeCursor.charAt(i + lowerWord.length())));
+                        if (isWordStart && isWordEnd) {
+                            wordStartPos = i;
+                            break;
+                        }
+                    }
+                }
+                
+                mInputLogic.mConnection.beginBatchEdit();
+                
+                if (wordStartPos >= 0) {
+                    // Calculate how many characters to delete from cursor position
+                    // Need to delete: word + punctuation + any characters between cursor and word end
+                    int totalLength = wordLength + punctuationLength;
+                    int charsFromEnd = textBeforeCursor.length() - wordStartPos - totalLength;
+                    // Delete any characters between cursor and word end
+                    for (int i = 0; i < charsFromEnd; i++) {
+                        mInputLogic.mConnection.deleteTextBeforeCursor(1);
+                    }
+                    // Delete the word and punctuation
+                    for (int i = 0; i < totalLength; i++) {
+                        mInputLogic.mConnection.deleteTextBeforeCursor(1);
+                    }
+                } else {
+                    // Fallback: just delete the word length + punctuation
+                    for (int i = 0; i < wordLength + punctuationLength; i++) {
+                        mInputLogic.mConnection.deleteTextBeforeCursor(1);
+                    }
+                }
+                
+                // Build replacement: corrected word + punctuation + space
+                String textToCommit = caseMatchedReplacement + punctuation;
+                if (isSeparatorEvent) {
+                    textToCommit = caseMatchedReplacement + punctuation + " ";
+                }
+                mInputLogic.mConnection.commitText(textToCommit, 1);
+                mInputLogic.mConnection.endBatchEdit();
+                mSuggestionBar.hideSuggestion();
+            } else {
+                // Show suggestion bar with case-matched replacement
+                // Update colors first, then show suggestion
+                updateSuggestionBarColor();
+                // Show original word with punctuation on left, correction (with punctuation) on right
+                String originalWithPunctuation = lastWord + punctuation;
+                String correctedWithPunctuation = caseMatchedReplacement + punctuation;
+                mSuggestionBar.showSuggestion(originalWithPunctuation, correctedWithPunctuation, isAlwaysOn);
+            }
+        } else {
+            // No replacement found, but still show the current word in the left column
+            String originalWithPunctuation = lastWord + punctuation;
+            updateSuggestionBarColor();
+            mSuggestionBar.showSuggestion(originalWithPunctuation, null, false);
+        }
+    }
+    
+    /**
+     * Check for text replacement suggestions after text input (default: not a separator event)
+     */
+    public void checkTextReplacement() {
+        checkTextReplacement(false);
     }
 
     // A helper method to split the code point and the key code. Ultimately, they should not be
@@ -761,6 +1325,21 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // Called from PointerTracker through the KeyboardActionListener interface
     @Override
     public void onTextInput(final String rawText) {
+        // Check if the suggestion bar's EditText is focused - if so, route input there
+        if (mSuggestionBar != null && mSuggestionBar.isCorrectionTextFocused()) {
+            android.widget.EditText editText = mSuggestionBar.getCorrectionEditText();
+            if (editText != null) {
+                int start = editText.getSelectionStart();
+                int end = editText.getSelectionEnd();
+                if (start < 0) start = editText.getText().length();
+                if (end < 0) end = start;
+                editText.getText().replace(Math.min(start, end), Math.max(start, end), rawText, 0, rawText.length());
+                // Move cursor to end of inserted text
+                editText.setSelection(start + rawText.length());
+            }
+            return;
+        }
+        
         // TODO: have the keyboard pass the correct key code when we need it.
         final Event event = Event.createSoftwareTextEvent(rawText, Constants.CODE_OUTPUT_TEXT);
         final InputTransaction completeInputTransaction =
@@ -788,6 +1367,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // Reload keyboard because the current language has been changed.
             mKeyboardSwitcher.loadKeyboard(getCurrentInputEditorInfo(), mSettings.getCurrent(),
                     getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+            // Update suggestion bar color when keyboard theme changes
+            updateSuggestionBarColor();
+            // Update suggestion bar position when keyboard layout changes (e.g., number row toggled)
+            final MainKeyboardView keyboardView = mKeyboardSwitcher.getMainKeyboardView();
+            if (keyboardView != null && mSuggestionBar != null) {
+                keyboardView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        positionSuggestionBarAboveKeyboard(keyboardView);
+                    }
+                });
+            }
         }
     }
 

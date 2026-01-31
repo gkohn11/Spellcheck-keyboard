@@ -14,28 +14,11 @@
      limitations under the License.
 -->
 
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="42dp"
-    android:height="42dp"
-    android:viewportWidth="42"
-    android:viewportHeight="42">
-    <group
-        android:translateX="12"
-        android:translateY="12">
-        <path
-            android:fillColor="#5695FD"
-            android:strokeColor="#5695FD"
-            android:strokeWidth="3"
-            android:strokeLineJoin="round"
-            android:pathData="M1,1 17,1 17,5 1,5 z"/>
-        <path
-            android:fillColor="#C8CBCD"
-            android:strokeColor="#C8CBCD"
-            android:strokeWidth="1"
-            android:strokeLineJoin="round"
-            android:pathData="@string/icon_launcher_keys"/>
-        <path
-            android:fillColor="@android:color/white"
-            android:pathData="@string/icon_launcher_text"/>
-    </group>
-</vector>
+<!-- Since PNG files are already cropped, use smaller or no insets -->
+<!-- Adjust these values: 0% = no zoom, negative = zoom in, positive = zoom out -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@mipmap/ic_launcher"
+    android:insetLeft="0%"
+    android:insetTop="0%"
+    android:insetRight="0%"
+    android:insetBottom="0%" />

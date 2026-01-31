@@ -279,8 +279,43 @@ public class Key implements Comparable<Key> {
         if ((mLabelFlags & LABEL_FLAGS_DISABLE_ADDITIONAL_MORE_KEYS) != 0) {
             additionalMoreKeys = null;
         } else {
-            additionalMoreKeys = style.getStringArray(keyAttr,
-                    R.styleable.Keyboard_Key_additionalMoreKeys);
+            // additionalMoreKeys can contain:
+            // 1. Numbers (when number row is NOT shown) - controlled by long press for numbers setting
+            // 2. Special characters (when number row IS shown AND special chars are shown) - always allow
+            // 
+            // The "long press for numbers" preference is greyed out (disabled) when:
+            // - Number row is ON, OR
+            // - Number row is OFF AND special chars are ON
+            // When greyed out, ignore the preference value and use original behavior
+            
+            boolean isPreferenceGreyedOut = params.mId.mShowNumberRow || 
+                    (!params.mId.mShowNumberRow && params.mId.mShowMoreKeys);
+            
+            if (params.mId.mShowNumberRow) {
+                // When number row is shown, additionalMoreKeys contains special characters
+                // Allow them if special characters are enabled (original behavior)
+                if (params.mId.mShowMoreKeys) {
+                    additionalMoreKeys = style.getStringArray(keyAttr,
+                            R.styleable.Keyboard_Key_additionalMoreKeys);
+                } else {
+                    additionalMoreKeys = null;
+                }
+            } else {
+                // When number row is NOT shown, additionalMoreKeys contains numbers
+                if (isPreferenceGreyedOut) {
+                    // Preference is greyed out - use original behavior (allow, regardless of preference value)
+                    additionalMoreKeys = style.getStringArray(keyAttr,
+                            R.styleable.Keyboard_Key_additionalMoreKeys);
+                } else {
+                    // Preference is active - check long press for numbers setting
+                    if (params.mLongPressForNumbers) {
+                        additionalMoreKeys = style.getStringArray(keyAttr,
+                                R.styleable.Keyboard_Key_additionalMoreKeys);
+                    } else {
+                        additionalMoreKeys = null;
+                    }
+                }
+            }
         }
         moreKeys = MoreKeySpec.insertAdditionalMoreKeys(moreKeys, additionalMoreKeys);
         if (moreKeys != null) {
@@ -315,9 +350,22 @@ public class Key implements Comparable<Key> {
         } else {
             final String hintLabel = style.getString(
                     keyAttr, R.styleable.Keyboard_Key_keyHintLabel);
-            mHintLabel = needsToUpcase
-                    ? StringUtils.toTitleCaseOfKeyLabel(hintLabel, localeForUpcasing)
-                    : hintLabel;
+            if (hintLabel != null) {
+                // Hide number hints if:
+                // 1. Special characters are disabled AND
+                // 2. Long press for numbers is disabled
+                // Number hints are single digits (0-9) that appear when number row is off
+                boolean isNumberHint = hintLabel.length() == 1 && Character.isDigit(hintLabel.charAt(0));
+                if (isNumberHint && !params.mId.mShowMoreKeys && !params.mLongPressForNumbers) {
+                    mHintLabel = null;
+                } else {
+                    mHintLabel = needsToUpcase
+                            ? StringUtils.toTitleCaseOfKeyLabel(hintLabel, localeForUpcasing)
+                            : hintLabel;
+                }
+            } else {
+                mHintLabel = null;
+            }
         }
         String outputText = KeySpecParser.getOutputText(keySpec);
         if (needsToUpcase) {

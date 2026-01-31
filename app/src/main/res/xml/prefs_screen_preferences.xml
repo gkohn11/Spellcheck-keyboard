@@ -31,6 +31,10 @@
         android:title="@string/show_special_chars"
         android:defaultValue="true" />
     <SwitchPreference
+        android:key="pref_long_press_for_numbers"
+        android:title="@string/long_press_for_numbers"
+        android:defaultValue="true" />
+    <SwitchPreference
         android:key="pref_show_language_switch_key"
         android:title="@string/show_language_switch_key"
         android:defaultValue="true" />
@@ -52,4 +56,8 @@
         android:key="pref_delete_swipe"
         android:title="@string/delete_swipe"
         android:defaultValue="false" />
+    <SwitchPreference
+        android:key="pref_text_replacement_enabled"
+        android:title="@string/text_replacement_enabled"
+        android:defaultValue="true" />
 </PreferenceScreen>

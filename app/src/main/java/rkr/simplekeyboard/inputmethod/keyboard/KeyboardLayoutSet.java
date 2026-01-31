@@ -106,6 +106,7 @@ public final class KeyboardLayoutSet {
         int mKeyboardBottomOffset;
         boolean mShowMoreKeys;
         boolean mShowNumberRow;
+        boolean mLongPressForNumbers;
         // Sparse array of KeyboardLayoutSet element parameters indexed by element's id.
         final SparseArray<ElementParams> mKeyboardLayoutSetElementIdToParamsMap =
                 new SparseArray<>();
@@ -174,6 +175,7 @@ public final class KeyboardLayoutSet {
 
         final KeyboardBuilder<KeyboardParams> builder =
                 new KeyboardBuilder<>(mContext, new KeyboardParams(sUniqueKeysCache));
+        builder.setLongPressForNumbers(mParams.mLongPressForNumbers);
         sUniqueKeysCache.setEnabled(id.isAlphabetKeyboard());
         builder.setAllowRedundantMoreKes(elementParams.mAllowRedundantMoreKeys);
         final int keyboardXmlId = elementParams.mKeyboardXmlId;
@@ -253,6 +255,11 @@ public final class KeyboardLayoutSet {
 
         public Builder setShowNumberRow(final boolean enabled) {
             mParams.mShowNumberRow = enabled;
+            return this;
+        }
+
+        public Builder setLongPressForNumbers(final boolean enabled) {
+            mParams.mLongPressForNumbers = enabled;
             return this;
         }
 

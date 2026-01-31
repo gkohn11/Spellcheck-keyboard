@@ -44,15 +44,60 @@ public final class PreferencesSettingsFragment extends SubScreenFragment {
         super.onCreate(icicle);
         addPreferencesFromResource(R.xml.prefs_screen_preferences);
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+        if (Build.VERSION.SDK_INT < 35) { // BAKLAVA (API 35)
             removePreference(Settings.PREF_USE_ON_SCREEN);
         }
+        
+        // Set up long press for numbers preference to be disabled when:
+        // 1. Number row is on, OR
+        // 2. Show special characters is on (when number row is off)
+        final android.preference.SwitchPreference longPressPref = 
+            (android.preference.SwitchPreference) findPreference(Settings.PREF_LONG_PRESS_FOR_NUMBERS);
+        final android.preference.SwitchPreference numberRowPref = 
+            (android.preference.SwitchPreference) findPreference(Settings.PREF_SHOW_NUMBER_ROW);
+        final android.preference.SwitchPreference showSpecialCharsPref = 
+            (android.preference.SwitchPreference) findPreference(Settings.PREF_SHOW_SPECIAL_CHARS);
+        
+        if (longPressPref != null && numberRowPref != null && showSpecialCharsPref != null) {
+            // Update enabled state based on current settings
+            updateLongPressForNumbersEnabled(longPressPref, numberRowPref.isChecked(), showSpecialCharsPref.isChecked());
+            
+            // Listen for changes to number row setting
+            numberRowPref.setOnPreferenceChangeListener(new android.preference.Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(android.preference.Preference preference, Object newValue) {
+                    boolean isNumberRowOn = (Boolean) newValue;
+                    updateLongPressForNumbersEnabled(longPressPref, isNumberRowOn, showSpecialCharsPref.isChecked());
+                    return true;
+                }
+            });
+            
+            // Listen for changes to show special characters setting
+            showSpecialCharsPref.setOnPreferenceChangeListener(new android.preference.Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(android.preference.Preference preference, Object newValue) {
+                    boolean isShowSpecialCharsOn = (Boolean) newValue;
+                    updateLongPressForNumbersEnabled(longPressPref, numberRowPref.isChecked(), isShowSpecialCharsOn);
+                    return true;
+                }
+            });
+        }
+    }
+    
+    private void updateLongPressForNumbersEnabled(android.preference.SwitchPreference longPressPref, 
+            boolean numberRowEnabled, boolean showSpecialCharsEnabled) {
+        // Disable long press for numbers when:
+        // 1. Number row is enabled, OR
+        // 2. Show special characters is enabled (when number row is off)
+        boolean shouldDisable = numberRowEnabled || (!numberRowEnabled && showSpecialCharsEnabled);
+        longPressPref.setEnabled(!shouldDisable);
     }
 
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
         if (key.equals(Settings.PREF_SHOW_SPECIAL_CHARS) ||
-                key.equals(Settings.PREF_SHOW_NUMBER_ROW)) {
+                key.equals(Settings.PREF_SHOW_NUMBER_ROW) ||
+                key.equals(Settings.PREF_LONG_PRESS_FOR_NUMBERS)) {
             KeyboardLayoutSet.onKeyboardThemeChanged();
         }
     }

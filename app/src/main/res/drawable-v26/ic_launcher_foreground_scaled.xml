@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Alternative: Scale drawable to zoom in -->
+<scale xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@mipmap/ic_launcher"
+    android:scaleWidth="200%"
+    android:scaleHeight="200%"
+    android:scaleGravity="center" />
+

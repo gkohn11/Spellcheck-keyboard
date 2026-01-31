@@ -159,6 +159,10 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
         mParams.mAllowRedundantMoreKeys = enabled;
     }
 
+    public void setLongPressForNumbers(final boolean enabled) {
+        mParams.mLongPressForNumbers = enabled;
+    }
+
     public KeyboardBuilder<KP> load(final int xmlId, final KeyboardId id) {
         mParams.mId = id;
         final XmlResourceParser parser = mResources.getXml(xmlId);

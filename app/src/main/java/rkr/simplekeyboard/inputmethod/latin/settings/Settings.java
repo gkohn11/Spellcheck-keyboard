@@ -64,6 +64,8 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_SHOW_NUMBER_ROW = "pref_show_number_row";
     public static final String PREF_SPACE_SWIPE = "pref_space_swipe";
     public static final String PREF_DELETE_SWIPE = "pref_delete_swipe";
+    public static final String PREF_TEXT_REPLACEMENT_ENABLED = "pref_text_replacement_enabled";
+    public static final String PREF_LONG_PRESS_FOR_NUMBERS = "pref_long_press_for_numbers";
 
     private static final float UNDEFINED_PREFERENCE_VALUE_FLOAT = -1.0f;
     private static final int UNDEFINED_PREFERENCE_VALUE_INT = -1;
@@ -249,6 +251,14 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     public static boolean readDeleteSwipeEnabled(final SharedPreferences prefs) {
         return prefs.getBoolean(PREF_DELETE_SWIPE, false);
+    }
+
+    public static boolean readTextReplacementEnabled(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_TEXT_REPLACEMENT_ENABLED, true);
+    }
+
+    public static boolean readLongPressForNumbers(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_LONG_PRESS_FOR_NUMBERS, true);
     }
 
     public static String readPrefSubtypes(final SharedPreferences prefs) {

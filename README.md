@@ -1,4 +1,4 @@
-# Simple Keyboard
+# Spellcheck Keyboard
 
 [![Crowdin](https://d322cqt584bo4o.cloudfront.net/simple-keyboard/localized.svg)](https://crowdin.com/project/simple-keyboard)
 
@@ -7,6 +7,8 @@
       width="500"/>
       
 ## About
+
+Spellcheck Keyboard is a free and open-source Android keyboard based on Simple Keyboard, which itself is based on the AOSP LatinIME keyboard.
 
 Features:
 - Small size (<1MB)
@@ -17,11 +19,12 @@ Features:
 - Custom theme colors
 - Minimal permissions (only Vibrate)
 - Ads-free
+- **Text replacement with spellcheck suggestions**
+- **Customizable auto-correction**
 
 Feature it doesn't have and probably will never have:
 - Emojis
 - GIFs
-- Spell checker
 - Swipe typing
 
 ## Downloads
@@ -33,8 +36,24 @@ Feature it doesn't have and probably will never have:
       alt="Get it on Google Play"
       height="80">](https://play.google.com/store/apps/details?id=rkr.simplekeyboard.inputmethod)
 
+## License
+
+This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
+
+This keyboard is a derivative work based on:
+- **Simple Keyboard** by Raimondas Rimkus and contributors
+- **AOSP LatinIME keyboard** by The Android Open Source Project
+
+You can find the original AOSP LatinIME source code at:
+https://android.googlesource.com/platform/packages/inputmethods/LatinIME/
+
 ## Credits
 
-Licensed under Apache License Version 2
+**Spellcheck Keyboard** is a derivative work that extends Simple Keyboard with text replacement and spellcheck functionality.
 
-This keyboard is based on AOSP LatinIME keyboard. You can get the original source code in https://android.googlesource.com/platform/packages/inputmethods/LatinIME/
+**Original Contributors:**
+- The Android Open Source Project (AOSP LatinIME)
+- Raimondas Rimkus (Simple Keyboard)
+- wittmane, Maarten Trompper, Micha LaQua, Emmanuel (Simple Keyboard contributors)
+
+This project follows the same free and open-source Apache License 2.0 as the original Simple Keyboard project. All modifications and additions are also released under the Apache License 2.0.

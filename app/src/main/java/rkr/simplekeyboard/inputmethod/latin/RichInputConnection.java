@@ -237,6 +237,13 @@ public final class RichInputConnection {
     }
 
     /**
+     * Get the text before cursor (for text replacement checking)
+     */
+    public String getTextBeforeCursor() {
+        return mTextBeforeCursor;
+    }
+
+    /**
      * Calls {@link InputConnection#commitText(CharSequence, int)}.
      *
      * @param text The text to commit. This may include styles.

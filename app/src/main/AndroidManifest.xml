@@ -17,11 +17,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
-        android:allowBackup="true"
-        android:fullBackupOnly="true"
-        android:icon="@drawable/ic_launcher"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/english_ime_name"
         android:supportsRtl="true">
 
@@ -51,6 +54,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".latin.settings.TextReplacementActivity"
+            android:label="@string/settings_screen_text_replacement"
+            android:exported="false"
+            android:parentActivityName=".latin.settings.SettingsActivity"
+            android:theme="@style/platformSettingsThemeAppCompat" />
+
         <receiver
             android:name=".latin.SystemBroadcastReceiver"
             android:exported="false">
@@ -61,6 +71,16 @@
 
         <meta-data android:name="android.content.APP_RESTRICTIONS"
             android:resource="@xml/app_restrictions" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

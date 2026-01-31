@@ -34,6 +34,7 @@ import rkr.simplekeyboard.inputmethod.latin.RichInputConnection;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
+import rkr.simplekeyboard.inputmethod.latin.settings.TextReplacementManager;
 import rkr.simplekeyboard.inputmethod.latin.utils.InputTypeUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.RecapitalizeStatus;
 import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils;
@@ -96,6 +97,8 @@ public final class InputLogic {
         mConnection.commitText(text, 1);
         // Space state must be updated before calling updateShiftState
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+        // Check for text replacement after committing text
+        checkTextReplacement();
         return inputTransaction;
     }
 
@@ -155,11 +158,13 @@ public final class InputLogic {
      */
     private void handleConsumedEvent(final Event event) {
         // A consumed event may have text to commit and an update to the composing state, so
-        // we evaluate both. With some combiners, it's possible than an event contains both
+                // we evaluate both. With some combiners, it's possible than an event contains both
         // and we enter both of the following if clauses.
         final CharSequence textToCommit = event.getTextToCommit();
         if (!TextUtils.isEmpty(textToCommit)) {
             mConnection.commitText(textToCommit, 1);
+            // Check for text replacement after committing text
+            checkTextReplacement();
         }
     }
 
@@ -281,6 +286,8 @@ public final class InputLogic {
             handleSeparatorEvent(event, inputTransaction);
         } else {
             handleNonSeparatorEvent(event);
+            // Check for text replacement after each character (not just after separators)
+            checkTextReplacement();
         }
     }
 
@@ -301,6 +308,20 @@ public final class InputLogic {
         sendKeyCodePoint(event.mCodePoint);
 
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+        
+        // Check for text replacement after separator (word is complete) - this allows auto-replace
+        if (mLatinIME != null) {
+            mLatinIME.checkTextReplacement(true);
+        }
+    }
+    
+    /**
+     * Check for text replacement suggestions
+     */
+    private void checkTextReplacement() {
+        if (mLatinIME != null) {
+            mLatinIME.checkTextReplacement();
+        }
     }
 
     /**

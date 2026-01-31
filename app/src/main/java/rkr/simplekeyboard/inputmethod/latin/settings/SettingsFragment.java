@@ -57,6 +57,14 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
                 return true;
             }
         });
+        findPreference("screen_text_replacement").setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(Preference preference) {
+                Intent intent = new Intent(getActivity(), TextReplacementActivity.class);
+                startActivity(intent);
+                return true;
+            }
+        });
     }
 
     private void openUrl(String uri) {

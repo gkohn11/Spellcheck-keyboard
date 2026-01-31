@@ -69,6 +69,8 @@ public class KeyboardParams {
     public final KeyStylesSet mKeyStyles = new KeyStylesSet(mTextsSet);
 
     private final UniqueKeysCache mUniqueKeysCache;
+    
+    public boolean mLongPressForNumbers = true; // Default to true for backward compatibility
     public boolean mAllowRedundantMoreKeys;
 
     public int mMostCommonKeyHeight = 0;

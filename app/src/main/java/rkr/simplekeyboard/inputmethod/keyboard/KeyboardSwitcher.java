@@ -121,6 +121,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         builder.setLanguageSwitchKeyEnabled(mLatinIME.shouldShowLanguageSwitchKey());
         builder.setShowSpecialChars(settingsValues.mShowSpecialChars);
         builder.setShowNumberRow(settingsValues.mShowNumberRow);
+        builder.setLongPressForNumbers(settingsValues.mLongPressForNumbers);
         mKeyboardLayoutSet = builder.build();
         try {
             mState.onLoadKeyboard(currentAutoCapsState, currentRecapitalizeState);
