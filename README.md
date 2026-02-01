@@ -11,7 +11,6 @@
 Spellcheck Keyboard is a free and open-source Android keyboard based on Simple Keyboard, which itself is based on the AOSP LatinIME keyboard.
 
 Features:
-- Small size (<1MB)
 - Adjustable keyboard height for more screen space
 - Number row
 - Swipe space to move pointer
