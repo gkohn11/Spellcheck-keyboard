@@ -18,12 +18,12 @@
 */
 -->
 
-<rkr.simplekeyboard.inputmethod.latin.InputView
+<com.gkohn11.spellcheckkeyboard.latin.InputView
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     style="?attr/inputViewStyle">
-    <rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView
+    <com.gkohn11.spellcheckkeyboard.keyboard.MainKeyboardView
         android:id="@+id/keyboard_view"
         android:layoutDirection="ltr"
         android:layout_gravity="bottom"
@@ -31,10 +31,10 @@
         android:fitsSystemWindows="true"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
-    <rkr.simplekeyboard.inputmethod.latin.TextReplacementSuggestionBar
+    <com.gkohn11.spellcheckkeyboard.latin.TextReplacementSuggestionBar
         android:id="@+id/suggestion_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:visibility="visible" />
-</rkr.simplekeyboard.inputmethod.latin.InputView>
+</com.gkohn11.spellcheckkeyboard.latin.InputView>

@@ -16,7 +16,7 @@
 #   public *;
 #}
 
--keep class rkr.simplekeyboard.inputmethod.R
--keep class rkr.simplekeyboard.inputmethod.latin.settings.SettingsFragment
--keep class rkr.simplekeyboard.inputmethod.latin.settings.LanguagesSettingsFragment
--keep class rkr.simplekeyboard.inputmethod.latin.settings.SingleLanguageSettingsFragment
+-keep class com.gkohn11.spellcheckkeyboard.R
+-keep class com.gkohn11.spellcheckkeyboard.latin.settings.SettingsFragment
+-keep class com.gkohn11.spellcheckkeyboard.latin.settings.LanguagesSettingsFragment
+-keep class com.gkohn11.spellcheckkeyboard.latin.settings.SingleLanguageSettingsFragment

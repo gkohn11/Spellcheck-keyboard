@@ -2,12 +2,12 @@ apply plugin: 'com.android.application'
 
 android {
     defaultConfig {
-        applicationId "rkr.simplekeyboard.inputmethod"
+        applicationId "com.gkohn11.spellcheckkeyboard"
         compileSdk 34
         minSdkVersion 24
         targetSdkVersion 34
-        versionCode 145
-        versionName "6.4"
+        versionCode 1
+        versionName "1.0.0"
     }
     buildTypes {
         release {
@@ -15,7 +15,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    namespace 'rkr.simplekeyboard.inputmethod'
+    namespace 'com.gkohn11.spellcheckkeyboard'
 }
 
 dependencies {

@@ -12,7 +12,7 @@
 
 4. **Uninstall any existing version first:**
    ```
-   adb uninstall rkr.simplekeyboard.inputmethod
+   adb uninstall com.gkohn11.spellcheckkeyboard
    ```
 
 5. **Install the APK:**
