@@ -30,6 +30,7 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputConnectionWrapper;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -40,14 +41,18 @@ import com.gkohn11.spellcheckkeyboard.R;
  * Suggestion bar that appears above the keyboard to show text replacement suggestions.
  */
 public class TextReplacementSuggestionBar extends LinearLayout {
+    Button mScanButton; // Scan button on the left
+    View mScanDivider; // Divider after scan button
     TextView mOriginalWordText; // Package private for LatinIME to access
     EditText mCorrectionText; // Package private for LatinIME to access - now EditText for CSV input
     private String mCurrentOriginalWord;
     private String mCurrentSuggestion;
     private boolean mIsAutoReplace; // Track if current suggestion is auto-replace
     private boolean mIsEditableMode = false; // Track if correction box is in editable mode
+    private boolean mIsScanMode = false; // Track if we're in scan mode
     private OnSuggestionClickListener mListener;
     private OnCsvInputListener mCsvInputListener;
+    private OnScanClickListener mScanListener;
 
     public interface OnSuggestionClickListener {
         void onOriginalWordClicked(); // Called when user clicks the incorrect word (left side)
@@ -56,6 +61,12 @@ public class TextReplacementSuggestionBar extends LinearLayout {
     
     public interface OnCsvInputListener {
         void onCsvInput(String csvLine); // Called when user enters CSV format in the correction box
+    }
+    
+    public interface OnScanClickListener {
+        void onScanClicked(); // Called when user clicks the scan button
+        void onNextMisspelling(); // Called when user wants to go to next misspelling
+        void onPreviousMisspelling(); // Called when user wants to go to previous misspelling
     }
 
     public TextReplacementSuggestionBar(Context context) {
@@ -79,6 +90,44 @@ public class TextReplacementSuggestionBar extends LinearLayout {
         // Background color will be set by LatinIME to match keyboard theme
         // Default to a neutral color until theme is applied
         setBackgroundColor(0xFFE0E0E0);
+        
+        // Create scan button (leftmost)
+        mScanButton = new Button(getContext());
+        mScanButton.setText("🔍"); // Magnifying glass emoji for scan
+        mScanButton.setTextSize(14);
+        mScanButton.setPadding(12, 8, 12, 8);
+        mScanButton.setMinWidth(0);
+        mScanButton.setMinimumWidth(0);
+        mScanButton.setBackgroundColor(0x40000000); // Semi-transparent background
+        mScanButton.setTextColor(0xFF000000);
+        mScanButton.setClickable(true);
+        mScanButton.setFocusable(true);
+        mScanButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                if (mScanListener != null) {
+                    if (mIsScanMode) {
+                        // If already in scan mode, go to next misspelling
+                        mScanListener.onNextMisspelling();
+                    } else {
+                        // Start scan mode
+                        mScanListener.onScanClicked();
+                    }
+                }
+            }
+        });
+        // Long press to go to previous misspelling
+        mScanButton.setOnLongClickListener(new OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                if (mIsScanMode && mScanListener != null) {
+                    mScanListener.onPreviousMisspelling();
+                }
+                return true;
+            }
+        });
         
         // Create divider view
         View divider = new View(getContext());
@@ -166,6 +215,23 @@ public class TextReplacementSuggestionBar extends LinearLayout {
             }
         });
         
+        // Add scan button (leftmost, fixed width)
+        LinearLayout.LayoutParams scanButtonParams = new LinearLayout.LayoutParams(
+                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        scanButtonParams.gravity = android.view.Gravity.CENTER_VERTICAL;
+        mScanButton.setMinimumHeight(40);
+        mScanButton.setMinimumWidth(50);
+        addView(mScanButton, scanButtonParams);
+        
+        // Add small divider after scan button
+        mScanDivider = new View(getContext());
+        mScanDivider.setBackgroundColor(0x40000000);
+        LinearLayout.LayoutParams scanDividerParams = new LinearLayout.LayoutParams(
+                2, LayoutParams.MATCH_PARENT);
+        scanDividerParams.setMargins(0, 8, 0, 8);
+        mScanDivider.setLayoutParams(scanDividerParams);
+        addView(mScanDivider);
+        
         // Add original word text (left, weight 1)
         LinearLayout.LayoutParams originalParams = new LinearLayout.LayoutParams(
                 0, LayoutParams.WRAP_CONTENT, 1.0f);
@@ -194,6 +260,35 @@ public class TextReplacementSuggestionBar extends LinearLayout {
     
     public void setOnCsvInputListener(OnCsvInputListener listener) {
         mCsvInputListener = listener;
+    }
+    
+    public void setOnScanClickListener(OnScanClickListener listener) {
+        mScanListener = listener;
+    }
+    
+    public void setScanMode(boolean isScanMode) {
+        mIsScanMode = isScanMode;
+        if (mScanButton != null) {
+            if (isScanMode) {
+                mScanButton.setText("→"); // Arrow to indicate next
+                mScanButton.setBackgroundColor(0x60FFA500); // Orange highlight when active
+            } else {
+                mScanButton.setText("🔍");
+                mScanButton.setBackgroundColor(0x40000000);
+            }
+        }
+    }
+    
+    /**
+     * Set scan button visibility based on setting
+     */
+    public void setScanButtonEnabled(boolean enabled) {
+        if (mScanButton != null) {
+            mScanButton.setVisibility(enabled ? VISIBLE : GONE);
+        }
+        if (mScanDivider != null) {
+            mScanDivider.setVisibility(enabled ? VISIBLE : GONE);
+        }
     }
 
     public void showSuggestion(String originalWord, String suggestion, boolean isAutoReplace) {

@@ -60,4 +60,10 @@
         android:key="pref_text_replacement_enabled"
         android:title="@string/text_replacement_enabled"
         android:defaultValue="true" />
+    <SwitchPreference
+        android:key="pref_scan_button_enabled"
+        android:title="@string/scan_button_enabled"
+        android:summary="@string/scan_button_enabled_summary"
+        android:dependency="pref_text_replacement_enabled"
+        android:defaultValue="true" />
 </PreferenceScreen>

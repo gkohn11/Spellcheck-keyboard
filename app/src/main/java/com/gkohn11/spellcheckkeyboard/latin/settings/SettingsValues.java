@@ -50,6 +50,7 @@ public class SettingsValues {
     public final boolean mSpaceSwipeEnabled;
     public final boolean mDeleteSwipeEnabled;
     public final boolean mTextReplacementEnabled;
+    public final boolean mScanButtonEnabled;
     public final boolean mLongPressForNumbers;
 
     // From the input box
@@ -94,6 +95,7 @@ public class SettingsValues {
         mSpaceSwipeEnabled = Settings.readSpaceSwipeEnabled(prefs);
         mDeleteSwipeEnabled = Settings.readDeleteSwipeEnabled(prefs);
         mTextReplacementEnabled = Settings.readTextReplacementEnabled(prefs);
+        mScanButtonEnabled = Settings.readScanButtonEnabled(prefs);
         mLongPressForNumbers = Settings.readLongPressForNumbers(prefs);
     }
 

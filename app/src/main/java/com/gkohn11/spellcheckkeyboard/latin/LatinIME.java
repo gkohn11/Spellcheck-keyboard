@@ -50,6 +50,8 @@ import android.view.inputmethod.EditorInfo;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
@@ -103,6 +105,31 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     final KeyboardSwitcher mKeyboardSwitcher;
 
     private AlertDialog mOptionsDialog;
+    
+    // Scan mode state: sequential pass through all misspellings in the current text snapshot.
+    // We pre-compute all misspellings in order from the beginning of the visible text, then
+    // walk them one by one. User choices (left/right) move to the next item automatically.
+    private List<MisspellingInfo> mMisspellings = new ArrayList<>();
+    private int mCurrentMisspellingIndex = -1;
+    private boolean mIsScanMode = false;
+    // Base absolute position of index 0 of the scanned text snapshot, and cumulative delta in
+    // character count caused by replacements we've already applied during this scan session.
+    private int mScanBasePosition = 0;
+    private int mScanCumulativeDelta = 0;
+    
+    private static class MisspellingInfo {
+        final String word;      // Original word as it appears in text
+        final String correction; // Case-matched correction to apply
+        final int startPos;     // Start index within the scanned snapshot
+        final int endPos;       // End index within the scanned snapshot (exclusive)
+        
+        MisspellingInfo(String word, String correction, int startPos, int endPos) {
+            this.word = word;
+            this.correction = correction;
+            this.startPos = startPos;
+            this.endPos = endPos;
+        }
+    }
 
     public final UIHandler mHandler = new UIHandler(this);
 
@@ -344,6 +371,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             
             if (mSuggestionBar != null) {
                 updateSuggestionBarColor();
+                // Set scan button visibility based on setting
+                if (mSettings != null && mSettings.getCurrent() != null) {
+                    mSuggestionBar.setScanButtonEnabled(mSettings.getCurrent().mScanButtonEnabled);
+                }
                 mSuggestionBar.setOnSuggestionClickListener(new TextReplacementSuggestionBar.OnSuggestionClickListener() {
                     @Override
                     public void onOriginalWordClicked() {
@@ -363,6 +394,24 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     @Override
                     public void onCsvInput(String csvLine) {
                         handleCsvInput(csvLine);
+                    }
+                });
+                
+                // Handle scan button clicks
+                mSuggestionBar.setOnScanClickListener(new TextReplacementSuggestionBar.OnScanClickListener() {
+                    @Override
+                    public void onScanClicked() {
+                        handleScanClicked();
+                    }
+                    
+                    @Override
+                    public void onNextMisspelling() {
+                        handleNextMisspelling();
+                    }
+                    
+                    @Override
+                    public void onPreviousMisspelling() {
+                        handlePreviousMisspelling();
                     }
                 });
                 
@@ -440,6 +489,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // Force the text to be visible
             mSuggestionBar.mOriginalWordText.setVisibility(android.view.View.VISIBLE);
             mSuggestionBar.mCorrectionText.setVisibility(android.view.View.VISIBLE);
+            
+            // Update scan button visibility based on setting
+            if (mSettings != null && mSettings.getCurrent() != null) {
+                mSuggestionBar.setScanButtonEnabled(mSettings.getCurrent().mScanButtonEnabled);
+            }
         }
     }
     
@@ -892,6 +946,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         
+        // If user presses any key, cancel scan mode
+        if (mIsScanMode) {
+            resetScan();
+        }
+        
         final Event event = createSoftwareKeypressEvent(getCodePointForKeyboard(codePoint), isKeyRepeat);
         onEvent(event);
     }
@@ -906,21 +965,56 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     /**
-     * Handle click on original word - just add a space and leave the word as is
+     * Handle click on original word - leave the word as is
      */
     private void handleOriginalWordClick() {
-        if (mInputLogic == null || mInputLogic.mConnection == null) {
+        // If in scan mode, user chose to keep this word as-is.
+        // Move the cursor to the end of the word and advance to the next misspelling.
+        if (mIsScanMode && mCurrentMisspellingIndex >= 0 && mCurrentMisspellingIndex < mMisspellings.size()) {
+            MisspellingInfo info = mMisspellings.get(mCurrentMisspellingIndex);
+
+            if (mInputLogic != null && mInputLogic.mConnection != null) {
+                final int originalLength = info.endPos - info.startPos;
+                final int absoluteWordEnd = mScanBasePosition + mScanCumulativeDelta + info.endPos;
+
+                mInputLogic.mConnection.beginBatchEdit();
+                // Clear any selection by placing the cursor at the end of the word.
+                mInputLogic.mConnection.setSelection(absoluteWordEnd, absoluteWordEnd);
+                mInputLogic.mConnection.endBatchEdit();
+            }
+
+            // Advance to next misspelling in the precomputed list.
+            mCurrentMisspellingIndex++;
+            showCurrentMisspelling();
             return;
         }
         
-        // Simply commit a space
-        mInputLogic.mConnection.beginBatchEdit();
-        mInputLogic.mConnection.commitText(" ", 1);
-        mInputLogic.mConnection.endBatchEdit();
-        
-        // Hide suggestion bar
+        // Normal mode - user clicked the incorrect word, they want to keep it as is.
+        // Requirement: keep the word exactly as typed and add a single trailing space,
+        // and ensure that doing so does not immediately trigger an auto-correction.
         if (mSuggestionBar != null) {
             mSuggestionBar.hideSuggestion();
+        }
+
+        if (mInputLogic != null && mInputLogic.mConnection != null) {
+            // Reload cache to inspect text around the cursor
+            mInputLogic.mConnection.reloadTextCache();
+            String textBeforeCursor = mInputLogic.mConnection.getTextBeforeCursor();
+
+            // Only add a space if there isn't already one directly before the cursor,
+            // so we reliably end up with a single trailing space.
+            boolean endsWithSpace = textBeforeCursor != null
+                    && textBeforeCursor.length() > 0
+                    && textBeforeCursor.charAt(textBeforeCursor.length() - 1) == ' ';
+
+            if (!endsWithSpace) {
+                // Commit a literal space instead of going through the normal separator
+                // handling path. This avoids calling checkTextReplacement(true),
+                // so no auto-replace is performed for this word even if it is "always on".
+                mInputLogic.mConnection.commitText(" ", 1);
+                // No need to call checkTextReplacement here – user explicitly chose
+                // to keep the original word.
+            }
         }
     }
 
@@ -932,6 +1026,33 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         
+        // If in scan mode, replace the currently highlighted word and move to the next one.
+        if (mIsScanMode && mCurrentMisspellingIndex >= 0 && mCurrentMisspellingIndex < mMisspellings.size()) {
+            MisspellingInfo info = mMisspellings.get(mCurrentMisspellingIndex);
+
+            if (mInputLogic != null && mInputLogic.mConnection != null) {
+                final int originalLength = info.endPos - info.startPos;
+                final int absoluteWordStart = mScanBasePosition + mScanCumulativeDelta + info.startPos;
+                final int absoluteWordEnd = mScanBasePosition + mScanCumulativeDelta + info.endPos;
+
+                mInputLogic.mConnection.beginBatchEdit();
+                mInputLogic.mConnection.setSelection(absoluteWordStart, absoluteWordEnd);
+                mInputLogic.mConnection.deleteSelectedText();
+                mInputLogic.mConnection.commitText(suggestion, 1);
+                mInputLogic.mConnection.endBatchEdit();
+
+                // Track how much the text length changed so later indices stay correct.
+                final int delta = suggestion.length() - originalLength;
+                mScanCumulativeDelta += delta;
+            }
+
+            // Advance to the next misspelling.
+            mCurrentMisspellingIndex++;
+            showCurrentMisspelling();
+            return;
+        }
+        
+        // Normal mode - replace last word
         // Reload text cache to ensure we have the latest text
         mInputLogic.mConnection.reloadTextCache();
         
@@ -1305,6 +1426,178 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void checkTextReplacement() {
         checkTextReplacement(false);
     }
+    
+    /**
+     * Handle scan button click - scan all text for misspellings
+     */
+    private void handleScanClicked() {
+        if (mSuggestionBar == null) {
+            return;
+        }
+        
+        // Reload text cache to get latest text
+        mInputLogic.mConnection.reloadTextCache();
+        
+        // Get all text before cursor (this is what we can scan)
+        String textBeforeCursor = mInputLogic.mConnection.getTextBeforeCursor();
+        if (textBeforeCursor == null || textBeforeCursor.trim().isEmpty()) {
+            // No text to scan
+            mSuggestionBar.setScanMode(false);
+            mIsScanMode = false;
+            return;
+        }
+        
+        // Build a fresh, ordered list of all misspellings from the beginning of the visible text.
+        scanTextForMisspellings(textBeforeCursor);
+        if (mMisspellings.isEmpty()) {
+            // No misspellings found
+            resetScan();
+            return;
+        }
+
+        // Initialize scan coordinates relative to the current editor contents.
+        final int cursorPos = mInputLogic.mConnection.getExpectedSelectionStart();
+        mScanBasePosition = cursorPos - textBeforeCursor.length();
+        mScanCumulativeDelta = 0;
+
+        // Start scan mode at the first misspelling.
+        mIsScanMode = true;
+        mCurrentMisspellingIndex = 0;
+        mSuggestionBar.setScanMode(true);
+        showCurrentMisspelling();
+    }
+    
+    /**
+     * Scan text for all misspellings and store them
+     */
+    private void scanTextForMisspellings(String text) {
+        mMisspellings.clear();
+        TextReplacementManager manager = TextReplacementManager.getInstance(this);
+
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+
+        // Walk the text from the beginning, extracting words and checking against the CSV.
+        StringBuilder currentWord = new StringBuilder();
+        int wordStart = -1;
+
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            if (Character.isLetterOrDigit(c)) {
+                if (wordStart == -1) {
+                    wordStart = i;
+                }
+                currentWord.append(c);
+            } else {
+                // End of word
+                if (currentWord.length() > 0) {
+                    String word = currentWord.toString();
+                    String replacement = manager.getReplacement(word);
+                    if (replacement != null && !replacement.isEmpty()) {
+                        // Apply case matching once and store the final correction here.
+                        String caseMatched = applyCaseMatching(word, replacement);
+                        mMisspellings.add(new MisspellingInfo(
+                                word,
+                                caseMatched,
+                                wordStart,
+                                wordStart + word.length()
+                        ));
+                    }
+                    currentWord.setLength(0);
+                    wordStart = -1;
+                }
+            }
+        }
+
+        // Check last word if text doesn't end with punctuation
+        if (currentWord.length() > 0 && wordStart >= 0) {
+            String word = currentWord.toString();
+            String replacement = manager.getReplacement(word);
+            if (replacement != null && !replacement.isEmpty()) {
+                String caseMatched = applyCaseMatching(word, replacement);
+                mMisspellings.add(new MisspellingInfo(
+                        word,
+                        caseMatched,
+                        wordStart,
+                        wordStart + word.length()
+                ));
+            }
+        }
+    }
+    
+    /**
+     * Show the current misspelling in scan mode
+     */
+    private void showCurrentMisspelling() {
+        if (!mIsScanMode || mMisspellings.isEmpty()
+                || mCurrentMisspellingIndex < 0
+                || mCurrentMisspellingIndex >= mMisspellings.size()) {
+            // No more misspellings – end the scan.
+            resetScan();
+            return;
+        }
+
+        MisspellingInfo info = mMisspellings.get(mCurrentMisspellingIndex);
+
+        if (mInputLogic != null && mInputLogic.mConnection != null) {
+            final int absoluteWordStart = mScanBasePosition + mScanCumulativeDelta + info.startPos;
+            final int absoluteWordEnd = mScanBasePosition + mScanCumulativeDelta + info.endPos;
+
+            // Move cursor to select the misspelled word.
+            mInputLogic.mConnection.beginBatchEdit();
+            mInputLogic.mConnection.setSelection(absoluteWordStart, absoluteWordEnd);
+            mInputLogic.mConnection.endBatchEdit();
+        }
+
+        // Show suggestion for this word in the scan banner.
+        updateSuggestionBarColor();
+        mSuggestionBar.showSuggestion(info.word, info.correction, false);
+    }
+    
+    /**
+     * Handle next misspelling button click
+     */
+    private void handleNextMisspelling() {
+        if (!mIsScanMode || mMisspellings.isEmpty()) {
+            return;
+        }
+
+        mCurrentMisspellingIndex++;
+        showCurrentMisspelling();
+    }
+    
+    /**
+     * Reset scan mode - clear state and hide suggestion bar
+     */
+    private void resetScan() {
+        mIsScanMode = false;
+        mCurrentMisspellingIndex = -1;
+        mScanBasePosition = 0;
+        mScanCumulativeDelta = 0;
+        mMisspellings.clear();
+        if (mSuggestionBar != null) {
+            mSuggestionBar.setScanMode(false);
+            mSuggestionBar.hideSuggestion();
+        }
+    }
+    
+    /**
+     * Handle previous misspelling button click
+     */
+    private void handlePreviousMisspelling() {
+        if (!mIsScanMode || mMisspellings.isEmpty()) {
+            return;
+        }
+
+        mCurrentMisspellingIndex--;
+        if (mCurrentMisspellingIndex < 0) {
+            mCurrentMisspellingIndex = 0;
+        }
+
+        showCurrentMisspelling();
+    }
 
     // A helper method to split the code point and the key code. Ultimately, they should not be
     // squashed into the same variable, and this method should be removed.
@@ -1338,6 +1631,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 editText.setSelection(start + rawText.length());
             }
             return;
+        }
+        
+        // If user starts typing, cancel scan mode
+        if (mIsScanMode) {
+            resetScan();
         }
         
         // TODO: have the keyboard pass the correct key code when we need it.

@@ -242,6 +242,13 @@ public final class RichInputConnection {
     public String getTextBeforeCursor() {
         return mTextBeforeCursor;
     }
+    
+    /**
+     * Get the full text (before cursor + selection + after cursor)
+     */
+    public String getFullText() {
+        return mTextBeforeCursor + mTextSelection + mTextAfterCursor;
+    }
 
     /**
      * Calls {@link InputConnection#commitText(CharSequence, int)}.

@@ -122,6 +122,8 @@
     <string name="space_swipe">Space swipe cursor move</string>
     <string name="delete_swipe">Delete swipe</string>
     <string name="text_replacement_enabled">Text replacement?</string>
+    <string name="scan_button_enabled">Show scan button</string>
+    <string name="scan_button_enabled_summary">Show button to scan and fix misspellings in typed text</string>
     <string name="long_press_for_numbers">Long press for numbers</string>
     <string name="setup_message">Spellcheck Keyboard is not enabled. Click OK to open Languages &amp; Input settings. You will need to select Spellcheck Keyboard in your current keyboard to use it.</string>
     <string name="user_languages">Enabled keyboard languages</string>
