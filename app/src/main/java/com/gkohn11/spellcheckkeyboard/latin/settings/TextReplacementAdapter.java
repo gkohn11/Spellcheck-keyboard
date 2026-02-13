@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2025 Raimondas Rimkus
  * 
- * This file is part of Spellcheck Keyboard, a derivative work based on
+ * This file is part of Simple Spellcheck, a derivative work based on
  * Simple Keyboard (Copyright (C) 2025 Raimondas Rimkus and contributors)
  * which is based on AOSP LatinIME (Copyright (C) 2008 The Android Open Source Project).
  *
@@ -29,6 +29,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.Switch;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -39,11 +40,10 @@ import java.util.List;
  * Adapter for displaying and editing text replacement entries in a RecyclerView.
  */
 public class TextReplacementAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-    private static final int TYPE_HEADER = 0;
-    private static final int TYPE_ITEM = 1;
 
     private List<TextReplacementEntry> entries;
     private boolean dataChanged = false;
+    private boolean counterVisible = true;
     private java.util.Set<Integer> selectedPositions = new java.util.HashSet<>();
 
     public TextReplacementAdapter(List<TextReplacementEntry> entries) {
@@ -72,43 +72,32 @@ public class TextReplacementAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 
     @Override
     public int getItemViewType(int position) {
-        return position == 0 ? TYPE_HEADER : TYPE_ITEM;
+        return 0; // Only one type now (header is separate)
     }
 
     @NonNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         LayoutInflater inflater = LayoutInflater.from(parent.getContext());
-        if (viewType == TYPE_HEADER) {
-            View view = inflater.inflate(com.gkohn11.spellcheckkeyboard.R.layout.item_text_replacement_header, parent, false);
-            return new HeaderViewHolder(view);
-        } else {
-            View view = inflater.inflate(com.gkohn11.spellcheckkeyboard.R.layout.item_text_replacement, parent, false);
-            return new ItemViewHolder(view);
-        }
+        View view = inflater.inflate(com.gkohn11.spellcheckkeyboard.R.layout.item_text_replacement, parent, false);
+        return new ItemViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        if (holder instanceof HeaderViewHolder) {
-            // Header view - no data to bind
-            return;
-        }
-
         ItemViewHolder itemHolder = (ItemViewHolder) holder;
-        int dataPosition = position - 1; // Account for header
-        if (dataPosition >= 0 && dataPosition < entries.size()) {
-            TextReplacementEntry entry = entries.get(dataPosition);
-            itemHolder.bind(entry, dataPosition);
+        if (position >= 0 && position < entries.size()) {
+            TextReplacementEntry entry = entries.get(position);
+            itemHolder.bind(entry, position);
         } else {
             // This shouldn't happen, but handle gracefully
-            itemHolder.bind(new TextReplacementEntry(), dataPosition);
+            itemHolder.bind(new TextReplacementEntry(), position);
         }
     }
 
     @Override
     public int getItemCount() {
-        return entries.size() + 1; // +1 for header
+        return entries.size(); // No header in RecyclerView anymore
     }
 
     public List<TextReplacementEntry> getEntries() {
@@ -131,12 +120,10 @@ public class TextReplacementAdapter extends RecyclerView.Adapter<RecyclerView.Vi
     }
 
     /**
-     * ViewHolder for header row
+     * Set whether the counter column is visible for each row.
      */
-    static class HeaderViewHolder extends RecyclerView.ViewHolder {
-        HeaderViewHolder(View itemView) {
-            super(itemView);
-        }
+    public void setCounterVisible(boolean visible) {
+        this.counterVisible = visible;
     }
 
     /**
@@ -147,6 +134,7 @@ public class TextReplacementAdapter extends RecyclerView.Adapter<RecyclerView.Vi
         private EditText editMisspell;
         private EditText editCorrect;
         private Switch switchAlwaysOn;
+        private TextView textCounter;
         private int currentPosition = -1;
         private TextWatcher misspellWatcher;
         private TextWatcher correctWatcher;
@@ -159,6 +147,7 @@ public class TextReplacementAdapter extends RecyclerView.Adapter<RecyclerView.Vi
             editMisspell = itemView.findViewById(com.gkohn11.spellcheckkeyboard.R.id.edit_misspell);
             editCorrect = itemView.findViewById(com.gkohn11.spellcheckkeyboard.R.id.edit_correct);
             switchAlwaysOn = itemView.findViewById(com.gkohn11.spellcheckkeyboard.R.id.switch_always_on);
+            textCounter = itemView.findViewById(com.gkohn11.spellcheckkeyboard.R.id.text_counter);
         }
 
         void bind(TextReplacementEntry entry, int position) {
@@ -184,6 +173,10 @@ public class TextReplacementAdapter extends RecyclerView.Adapter<RecyclerView.Vi
             editMisspell.setText(entry.getMisspell());
             editCorrect.setText(entry.getCorrect());
             switchAlwaysOn.setChecked(entry.isAlwaysOn());
+            if (textCounter != null) {
+                textCounter.setText(String.valueOf(entry.getCounter()));
+                textCounter.setVisibility(counterVisible ? View.VISIBLE : View.GONE);
+            }
 
             // Create and add listeners
             misspellWatcher = new TextWatcher() {
@@ -203,11 +196,9 @@ public class TextReplacementAdapter extends RecyclerView.Adapter<RecyclerView.Vi
                         if (currentPosition == 0 && s.length() > 0) {
                             int oldSize = entries.size();
                             ensureEmptyRowAtStart();
-                            // Only notify if a new row was actually added
                             if (entries.size() > oldSize) {
-                                // Position in RecyclerView = 1 (header at 0, first item at 1)
-                                notifyItemInserted(1);
-                                // Update the position of the current item since we inserted before it
+                                // New empty row was inserted at index 0; current item shifted to index 1
+                                notifyItemInserted(0);
                                 currentPosition = 1;
                             }
                         }
@@ -233,11 +224,9 @@ public class TextReplacementAdapter extends RecyclerView.Adapter<RecyclerView.Vi
                         if (currentPosition == 0 && s.length() > 0) {
                             int oldSize = entries.size();
                             ensureEmptyRowAtStart();
-                            // Only notify if a new row was actually added
                             if (entries.size() > oldSize) {
-                                // Position in RecyclerView = 1 (header at 0, first item at 1)
-                                notifyItemInserted(1);
-                                // Update the position of the current item since we inserted before it
+                                // New empty row was inserted at index 0; current item shifted to index 1
+                                notifyItemInserted(0);
                                 currentPosition = 1;
                             }
                         }
@@ -292,7 +281,7 @@ public class TextReplacementAdapter extends RecyclerView.Adapter<RecyclerView.Vi
         for (int position : sortedPositions) {
             if (position >= 0 && position < entries.size()) {
                 entries.remove(position);
-                notifyItemRemoved(position + 1); // +1 for header
+                notifyItemRemoved(position); // No header offset needed
             }
         }
         

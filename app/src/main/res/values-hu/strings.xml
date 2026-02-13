@@ -58,6 +58,8 @@
     <string name="change_keyboard">Billentyűzetváltás</string>
     <string name="privacy_policy">Adatvédelmi irányelvek</string>
     <string name="license">Engedély</string>
+    <string name="send_feedback">Visszajelzés küldése</string>
+    <string name="settings_screen_text_replacement">Szöveg cseréje</string>
     <string name="show_language_switch_key">Nyelvváltó gomb megjelenítése</string>
     <string name="pref_use_on_screen">Képernyő-billentyűzet megjelenítése</string>
     <string name="show_special_chars">Speciális karakterek megjelenítése</string>

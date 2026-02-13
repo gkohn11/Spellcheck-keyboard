@@ -14,47 +14,72 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="8dp"
+    android:gravity="center_vertical"
+    android:minHeight="48dp"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
     android:background="?android:attr/listDivider">
 
     <TextView
         android:id="@+id/header_select"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Select"
+        android:layout_weight="0.6"
+        android:text="@string/tr_header_sel"
         android:textStyle="bold"
-        android:padding="8dp"
-        android:textSize="14sp" />
+        android:gravity="center"
+        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
 
     <TextView
         android:id="@+id/header_misspell"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Misspell"
+        android:layout_weight="1.2"
+        android:text="@string/tr_header_misspell"
         android:textStyle="bold"
-        android:padding="8dp"
-        android:textSize="14sp" />
+        android:gravity="center"
+        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
 
     <TextView
         android:id="@+id/header_correct"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Correct"
+        android:layout_weight="1.2"
+        android:text="@string/tr_header_correct"
         android:textStyle="bold"
-        android:padding="8dp"
-        android:textSize="14sp" />
+        android:gravity="center"
+        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
 
     <TextView
         android:id="@+id/header_always_on"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Auto"
+        android:layout_weight="0.6"
+        android:text="@string/tr_header_auto"
         android:textStyle="bold"
-        android:padding="8dp"
-        android:textSize="14sp" />
+        android:gravity="center"
+        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <ImageButton
+        android:id="@+id/button_menu"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="0.6"
+        android:src="@drawable/ic_more_vert"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Menu"
+        android:scaleType="centerInside"
+        android:padding="8dp" />
 
 </LinearLayout>
 

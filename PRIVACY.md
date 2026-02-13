@@ -1,10 +1,10 @@
-# Privacy Policy for Spellcheck Keyboard
+# Privacy Policy for Simple Spellcheck
 
 **Last Updated: January 2026**
 
 ## Data Collection
 
-**Spellcheck Keyboard does not collect, store, or transmit any personal data.**
+**Simple Spellcheck does not collect, store, or transmit any personal data.**
 
 We don't store your data. Period.
 
@@ -25,7 +25,7 @@ All text replacement data and settings are stored locally on your device only:
 
 ## Permissions
 
-Spellcheck Keyboard requests minimal permissions:
+Simple Spellcheck requests minimal permissions:
 - **Vibrate**: Used for haptic feedback when typing (optional, can be disabled)
 - **Storage (Android 9 and below)**: Only used for importing/exporting CSV files for text replacements
 

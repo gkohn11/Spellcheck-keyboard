@@ -1,4 +1,4 @@
-# Spellcheck Keyboard
+# Simple Spellcheck
 
 [![Crowdin](https://d322cqt584bo4o.cloudfront.net/simple-keyboard/localized.svg)](https://crowdin.com/project/simple-keyboard)
 
@@ -8,7 +8,7 @@
       
 ## About
 
-Spellcheck Keyboard is a free and open-source Android keyboard based on Simple Keyboard, which itself is based on the AOSP LatinIME keyboard.
+Simple Spellcheck is a free and open-source Android keyboard based on Simple Keyboard, which itself is based on the AOSP LatinIME keyboard.
 
 Features:
 - Adjustable keyboard height for more screen space
@@ -28,7 +28,7 @@ Feature it doesn't have and probably will never have:
 
 ## Downloads
 
-Spellcheck Keyboard is available on:
+Simple Spellcheck is available on:
 - **Google Play**: Coming soon
 - **F-Droid**: Coming soon
 - **GitHub Releases**: https://github.com/gkohn11/Spellcheck-keyboard/releases
@@ -46,7 +46,7 @@ https://android.googlesource.com/platform/packages/inputmethods/LatinIME/
 
 ## Credits
 
-**Spellcheck Keyboard** is a derivative work that extends Simple Keyboard with text replacement and spellcheck functionality.
+**Simple Spellcheck** is a derivative work that extends Simple Keyboard with text replacement and spellcheck functionality.
 
 **Fork Maintainer:**
 - Gavin Kohn (Text replacement and spellcheck features)

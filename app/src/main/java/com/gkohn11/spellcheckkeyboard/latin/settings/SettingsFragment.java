@@ -57,6 +57,13 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
                 return true;
             }
         });
+        findPreference("send_feedback").setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(Preference preference) {
+                openUrl(res.getString(R.string.feedback_url));
+                return true;
+            }
+        });
         findPreference("screen_text_replacement").setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             @Override
             public boolean onPreferenceClick(Preference preference) {

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2025 Raimondas Rimkus
  * 
- * This file is part of Spellcheck Keyboard, a derivative work based on
+ * This file is part of Simple Spellcheck, a derivative work based on
  * Simple Keyboard (Copyright (C) 2025 Raimondas Rimkus and contributors)
  * which is based on AOSP LatinIME (Copyright (C) 2008 The Android Open Source Project).
  *
@@ -49,6 +49,7 @@ public class TextReplacementSuggestionBar extends LinearLayout {
     private String mCurrentSuggestion;
     private boolean mIsAutoReplace; // Track if current suggestion is auto-replace
     private boolean mIsEditableMode = false; // Track if correction box is in editable mode
+    private boolean mIsCorrectionInputActive = false; // Manual flag: true while user is typing into the correction EditText
     private boolean mIsScanMode = false; // Track if we're in scan mode
     private OnSuggestionClickListener mListener;
     private OnCsvInputListener mCsvInputListener;
@@ -163,7 +164,7 @@ public class TextReplacementSuggestionBar extends LinearLayout {
         mCorrectionText.setSingleLine(true);
         mCorrectionText.setImeOptions(EditorInfo.IME_ACTION_DONE);
         
-        // Handle clicks - if showing a correction, replace word; if editable, focus for input
+        // Handle clicks - if showing a correction, replace word; if editable, activate input
         mCorrectionText.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -174,24 +175,8 @@ public class TextReplacementSuggestionBar extends LinearLayout {
                         mListener.onCorrectionClicked(mCurrentSuggestion);
                     }
                 } else if (mIsEditableMode) {
-                    // Editable mode - request focus for input
-                    mCorrectionText.requestFocus();
-                    // Show keyboard if not already shown
-                    android.view.inputmethod.InputMethodManager imm = 
-                        (android.view.inputmethod.InputMethodManager) getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-                    if (imm != null) {
-                        imm.showSoftInput(mCorrectionText, 0);
-                    }
-                }
-            }
-        });
-        
-        // Handle focus changes to ensure proper cursor visibility
-        mCorrectionText.setOnFocusChangeListener(new OnFocusChangeListener() {
-            @Override
-            public void onFocusChange(View v, boolean hasFocus) {
-                if (hasFocus && mIsEditableMode) {
-                    // When focused, ensure cursor is visible and at the end
+                    // Activate correction input mode - keyboard input will be routed here
+                    mIsCorrectionInputActive = true;
                     mCorrectionText.setCursorVisible(true);
                     int length = mCorrectionText.getText().length();
                     mCorrectionText.setSelection(length);
@@ -304,6 +289,7 @@ public class TextReplacementSuggestionBar extends LinearLayout {
             if (suggestion != null && !suggestion.isEmpty()) {
                 // Showing a correction - make non-editable, clickable
                 mIsEditableMode = false;
+                mIsCorrectionInputActive = false;
                 mCorrectionText.setText(suggestion);
                 mCorrectionText.setFocusable(false);
                 mCorrectionText.setClickable(true);
@@ -316,7 +302,7 @@ public class TextReplacementSuggestionBar extends LinearLayout {
                 mCorrectionText.setFocusable(true);
                 mCorrectionText.setFocusableInTouchMode(true);
                 mCorrectionText.setClickable(true);
-                mCorrectionText.setCursorVisible(true);
+                mCorrectionText.setCursorVisible(false); // Only show cursor when focused
                 mCorrectionText.setHint("Misspell,correct");
                 mCorrectionText.setVisibility(VISIBLE); // Keep visible but empty
             }
@@ -362,14 +348,16 @@ public class TextReplacementSuggestionBar extends LinearLayout {
         mCurrentSuggestion = null;
         mIsAutoReplace = false;
         mIsEditableMode = true; // Allow CSV input when no suggestion
+        mIsCorrectionInputActive = false; // Stop routing input here
         mOriginalWordText.setText(""); // Clear text but keep visible
         mCorrectionText.setText(""); // Clear text but keep visible
         mCorrectionText.setBackgroundColor(0x00000000); // Clear highlight
         mCorrectionText.setFocusable(true);
         mCorrectionText.setFocusableInTouchMode(true);
         mCorrectionText.setClickable(true);
-        mCorrectionText.setCursorVisible(true);
+        mCorrectionText.setCursorVisible(false); // Cursor only when focused
         mCorrectionText.setHint("Misspell,correct");
+        clearCorrectionFocus(); // Return input to main text field
         mOriginalWordText.setVisibility(VISIBLE); // Keep text view visible
         mCorrectionText.setVisibility(VISIBLE); // Keep text view visible
         setVisibility(VISIBLE); // Keep visible but empty
@@ -382,6 +370,7 @@ public class TextReplacementSuggestionBar extends LinearLayout {
         mCurrentOriginalWord = null;
         mCurrentSuggestion = null;
         mIsAutoReplace = false;
+        mIsCorrectionInputActive = false;
         mOriginalWordText.setText("");
         mCorrectionText.setText("");
         mCorrectionText.setBackgroundColor(0x00000000);
@@ -393,12 +382,26 @@ public class TextReplacementSuggestionBar extends LinearLayout {
     }
     
     /**
-     * Check if the correction EditText is focused and in editable mode
+     * Check if the correction EditText is actively receiving keyboard input.
+     * Uses a manual flag instead of Android's focus system, because focus in
+     * the IME window is independent of the app window and isFocused() does not
+     * change when the user taps the app's text field.
      */
     public boolean isCorrectionTextFocused() {
-        return mIsEditableMode && mCorrectionText != null && mCorrectionText.isFocused();
+        return mIsCorrectionInputActive;
     }
-    
+
+    /**
+     * Deactivate correction input so keyboard input goes back to the app's text field.
+     * Hides the EditText cursor so only the app's cursor is visible.
+     */
+    public void clearCorrectionFocus() {
+        mIsCorrectionInputActive = false;
+        if (mCorrectionText != null) {
+            mCorrectionText.setCursorVisible(false);
+        }
+    }
+
     /**
      * Get the correction EditText for direct input handling
      */

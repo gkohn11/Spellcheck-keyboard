@@ -15,6 +15,13 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- Fixed header at top -->
+    <include
+        android:id="@+id/header_view"
+        layout="@layout/item_text_replacement_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"
@@ -32,15 +39,15 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="start|bottom"
-            android:text="Export"
+            android:text="@string/tr_button_export"
             android:minWidth="80dp"
             android:minHeight="48dp" />
         <Button
-            android:id="@+id/button_delete"
+            android:id="@+id/button_search"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end|bottom"
-            android:text="DEL"
+            android:text="@string/tr_button_search"
             android:minWidth="80dp"
             android:minHeight="48dp" />
     </FrameLayout>

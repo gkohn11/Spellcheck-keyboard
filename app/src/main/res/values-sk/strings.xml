@@ -49,7 +49,7 @@
     <string name="show_number_row">Zobraziť samostatný číselný riadok</string>
     <string name="space_swipe">Hýb kurzorom šúchaním po medzerníku</string>
     <string name="delete_swipe">Mazanie potiahnutím</string>
-    <string name="setup_message">Spellcheck Keyboard nie je aktivovaný. Kliknite na OK pre otvorenie nastavení Jazyka a Vstupu. Pre použitie musíte zvoliť Spellcheck Keyboard namiesto Vašej súčasnej klávesnice.</string>
+    <string name="setup_message">Simple Spellcheck nie je aktivovaný. Kliknite na OK pre otvorenie nastavení Jazyka a Vstupu. Pre použitie musíte zvoliť Simple Spellcheck namiesto Vašej súčasnej klávesnice.</string>
     <string name="user_languages">Povolené jazyky klávesnice</string>
     <string name="add_language">Pridať jazyk</string>
     <string name="remove_language">Odstrániť jazyk</string>
@@ -57,6 +57,8 @@
     <string name="change_keyboard">Zmeniť klávesnicu</string>
     <string name="privacy_policy">Zásady ochrany osobných údajov</string>
     <string name="license">Licencia</string>
+    <string name="send_feedback">Odoslať spätnú väzbu</string>
+    <string name="settings_screen_text_replacement">Nahradiť text</string>
     <string name="show_language_switch_key">Zobraziť kláves pre prepínanie jazykov</string>
     <string name="pref_use_on_screen">Zobraziť klávesnicu na obrazovke</string>
     <string name="show_special_chars">Zobraziť špeciálne znaky</string>

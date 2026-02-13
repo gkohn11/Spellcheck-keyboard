@@ -30,7 +30,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:hint="Misspell"
+        android:hint="@string/tr_hint_misspell"
         android:padding="8dp"
         android:textSize="14sp"
         android:inputType="text"
@@ -42,7 +42,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:hint="Correct"
+        android:hint="@string/tr_hint_correct"
         android:padding="8dp"
         android:textSize="14sp"
         android:inputType="text"
@@ -61,6 +61,18 @@
             android:layout_gravity="center"
             android:padding="8dp" />
     </FrameLayout>
+
+    <TextView
+        android:id="@+id/text_counter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:textSize="12sp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:minHeight="48dp"
+        android:gravity="center_vertical" />
 
 </LinearLayout>
 

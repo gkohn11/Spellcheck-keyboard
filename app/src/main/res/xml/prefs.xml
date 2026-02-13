@@ -37,4 +37,7 @@
     <Preference
         android:title="@string/license"
         android:key="license" />
+    <Preference
+        android:title="@string/send_feedback"
+        android:key="send_feedback" />
 </PreferenceScreen>

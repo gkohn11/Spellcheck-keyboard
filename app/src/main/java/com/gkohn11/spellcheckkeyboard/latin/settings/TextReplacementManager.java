@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2025 Raimondas Rimkus
  * 
- * This file is part of Spellcheck Keyboard, a derivative work based on
+ * This file is part of Simple Spellcheck, a derivative work based on
  * Simple Keyboard (Copyright (C) 2025 Raimondas Rimkus and contributors)
  * which is based on AOSP LatinIME (Copyright (C) 2008 The Android Open Source Project).
  *
@@ -21,6 +21,7 @@
 package com.gkohn11.spellcheckkeyboard.latin.settings;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.util.Log;
 
 import java.util.HashMap;
@@ -33,6 +34,10 @@ import java.util.Map;
  */
 public class TextReplacementManager {
     private static final String TAG = "TextReplacementManager";
+    /** Same prefs name and key as TextReplacementActivity for counter on/off */
+    private static final String PREFS_NAME = "TextReplacementActivity";
+    private static final String PREFS_COUNTER_VISIBLE = "text_replacement_counter_visible";
+
     private static TextReplacementManager sInstance;
     private Map<String, String> mReplacements;
     private Map<String, Boolean> mAlwaysOnMap;
@@ -80,12 +85,18 @@ public class TextReplacementManager {
             // Load from storage
             List<TextReplacementEntry> entries = TextReplacementCsvManager.loadCsvFromStorage(mContext);
             
-            // Build lookup maps
+            // Build lookup maps. ^ on misspell = exact case match (key stored as "^im"); no ^ = case-insensitive (key "im").
             for (TextReplacementEntry entry : entries) {
                 String misspell = entry.getMisspell();
+                String correct = entry.getCorrect();
                 if (misspell != null && !misspell.trim().isEmpty()) {
-                    mReplacements.put(misspell.toLowerCase(), entry.getCorrect());
-                    mAlwaysOnMap.put(misspell.toLowerCase(), entry.isAlwaysOn());
+                    // Trim to avoid whitespace issues
+                    misspell = misspell.trim();
+                    correct = correct != null ? correct.trim() : "";
+                    String key = misspell.startsWith("^") ? misspell : misspell.toLowerCase();
+                    mReplacements.put(key, correct);
+                    mAlwaysOnMap.put(key, entry.isAlwaysOn());
+                    Log.d(TAG, "Loaded replacement: key='" + key + "' -> '" + correct + "'");
                 }
             }
             
@@ -96,28 +107,103 @@ public class TextReplacementManager {
     }
 
     /**
-     * Check if a word should be replaced and return the correct spelling
-     * @param word The word to check (case-insensitive)
-     * @return The correct spelling if found, null otherwise
+     * Resolve the ^ prefix on Correct: "^I'm" means use exact case "I'm" (strip ^, no case matching).
+     */
+    public static String resolveCapitalizePrefix(String replacement) {
+        if (replacement == null || !replacement.startsWith("^")) {
+            return replacement;
+        }
+        return replacement.length() > 1 ? replacement.substring(1) : "";
+    }
+
+    /**
+     * Get replacement for word. ^ on misspell = exact case only: "^im" matches only "im", not "IM" or "Im".
+     * @param word The word as typed (case matters when misspell has ^)
+     * @return The raw correct spelling if found, null otherwise
      */
     public String getReplacement(String word) {
         if (word == null || word.isEmpty()) {
             return null;
         }
-        return mReplacements.get(word.toLowerCase());
+        // Exact-case match first (misspell stored as "^im")
+        String exact = mReplacements.get("^" + word);
+        if (exact != null) {
+            Log.d(TAG, "getReplacement exact match: word='" + word + "' -> '" + exact + "'");
+            return exact;
+        }
+        String result = mReplacements.get(word.toLowerCase());
+        if (result != null) {
+            Log.d(TAG, "getReplacement case-insensitive: word='" + word + "' -> '" + result + "'");
+        }
+        return result;
     }
 
     /**
-     * Check if a replacement should always be applied automatically
-     * @param word The word to check (case-insensitive)
-     * @return true if always on, false otherwise
+     * Check if a replacement should always be applied automatically (same key logic as getReplacement).
      */
     public boolean isAlwaysOn(String word) {
         if (word == null || word.isEmpty()) {
             return false;
         }
-        Boolean alwaysOn = mAlwaysOnMap.get(word.toLowerCase());
+        Boolean alwaysOn = mAlwaysOnMap.get("^" + word);
+        if (alwaysOn != null) {
+            return alwaysOn;
+        }
+        alwaysOn = mAlwaysOnMap.get(word.toLowerCase());
         return alwaysOn != null && alwaysOn;
+    }
+
+    /**
+     * Whether usage counting is enabled (when "Turn off counter" is not set).
+     */
+    public static boolean isCounterEnabled(Context context) {
+        if (context == null) {
+            return true;
+        }
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getBoolean(PREFS_COUNTER_VISIBLE, true);
+    }
+
+    /**
+     * Increment the counter for a word when it's corrected (no-op if counter is off).
+     * @param word The word that was corrected (case-insensitive)
+     */
+    public void incrementCounter(String word) {
+        if (word == null || word.isEmpty() || mContext == null) {
+            return;
+        }
+        if (!isCounterEnabled(mContext)) {
+            return;
+        }
+        try {
+            // Load current entries
+            List<TextReplacementEntry> entries = TextReplacementCsvManager.loadCsvFromStorage(mContext);
+            String wordLower = word.toLowerCase();
+            
+            // Find and increment the counter (match exact-case ^misspell or case-insensitive misspell)
+            boolean found = false;
+            for (TextReplacementEntry entry : entries) {
+                String misspell = entry.getMisspell();
+                if (misspell == null) continue;
+                boolean match = misspell.startsWith("^")
+                    ? misspell.equals("^" + word)
+                    : misspell.toLowerCase().equals(wordLower);
+                if (match) {
+                    entry.incrementCounter();
+                    found = true;
+                    break;
+                }
+            }
+            
+            // Save updated entries back to CSV
+            if (found) {
+                TextReplacementCsvManager.saveCsvToStorage(mContext, entries);
+                // Reload to update the manager's internal state
+                reload();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to increment counter for word: " + word, e);
+        }
     }
 
     /**

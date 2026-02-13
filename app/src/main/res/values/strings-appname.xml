@@ -19,8 +19,9 @@
 -->
 
 <resources>
-    <string name="english_ime_name" translatable="false">Spellcheck Keyboard</string>
-    <string name="english_ime_settings" translatable="false">Spellcheck Keyboard Settings</string>
+    <string name="english_ime_name" translatable="false">Simple Spellcheck</string>
+    <string name="english_ime_settings" translatable="false">Simple Spellcheck Settings</string>
     <string name="privacy_policy_url" translatable="false">https://github.com/gkohn11/Spellcheck-keyboard/blob/master/PRIVACY.md</string>
     <string name="license_url" translatable="false">https://github.com/gkohn11/Spellcheck-keyboard/blob/master/LICENSE</string>
+    <string name="feedback_url" translatable="false">https://forms.gle/mrzzcpoY1DDtrbMk9</string>
 </resources>

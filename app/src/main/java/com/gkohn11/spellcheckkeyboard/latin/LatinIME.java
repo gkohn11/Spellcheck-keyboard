@@ -116,6 +116,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // character count caused by replacements we've already applied during this scan session.
     private int mScanBasePosition = 0;
     private int mScanCumulativeDelta = 0;
+    // Cursor position saved when scan mode starts, so we can restore it when scan ends.
+    private int mScanOriginalCursorPos = -1;
     
     private static class MisspellingInfo {
         final String word;      // Original word as it appears in text
@@ -564,6 +566,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     void onStartInputViewInternal(final EditorInfo editorInfo, final boolean restarting) {
         super.onStartInputView(editorInfo, restarting);
 
+        // Clear suggestion bar focus whenever a text field starts/restarts so keyboard input
+        // always goes to the app's text field and no stale cursor is shown in the suggestion bar.
+        if (mSuggestionBar != null) {
+            mSuggestionBar.clearCorrectionFocus();
+        }
+
         // Switch to the null consumer to handle cases leading to early exit below, for which we
         // also wouldn't be consuming gesture data.
         final KeyboardSwitcher switcher = mKeyboardSwitcher;
@@ -697,6 +705,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             final int composingSpanStart, final int composingSpanEnd) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
                 composingSpanStart, composingSpanEnd);
+
+        // If the suggestion bar's EditText is focused and the cursor moved in the main text
+        // field, the user tapped back on the app's text field.  Return focus so keyboard
+        // input goes to the main field and the extra cursor disappears.
+        if (mSuggestionBar != null && mSuggestionBar.isCorrectionTextFocused()) {
+            returnFocusToMainInput();
+        }
+
         final MainKeyboardView keyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (keyboardView != null && keyboardView.isInCursorMove()) {
             return;
@@ -972,17 +988,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // Move the cursor to the end of the word and advance to the next misspelling.
         if (mIsScanMode && mCurrentMisspellingIndex >= 0 && mCurrentMisspellingIndex < mMisspellings.size()) {
             MisspellingInfo info = mMisspellings.get(mCurrentMisspellingIndex);
-
+            
             if (mInputLogic != null && mInputLogic.mConnection != null) {
                 final int originalLength = info.endPos - info.startPos;
                 final int absoluteWordEnd = mScanBasePosition + mScanCumulativeDelta + info.endPos;
 
-                mInputLogic.mConnection.beginBatchEdit();
+                        mInputLogic.mConnection.beginBatchEdit();
                 // Clear any selection by placing the cursor at the end of the word.
-                mInputLogic.mConnection.setSelection(absoluteWordEnd, absoluteWordEnd);
-                mInputLogic.mConnection.endBatchEdit();
+                        mInputLogic.mConnection.setSelection(absoluteWordEnd, absoluteWordEnd);
+                        mInputLogic.mConnection.endBatchEdit();
             }
-
+            
             // Advance to next misspelling in the precomputed list.
             mCurrentMisspellingIndex++;
             showCurrentMisspelling();
@@ -994,6 +1010,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // and ensure that doing so does not immediately trigger an auto-correction.
         if (mSuggestionBar != null) {
             mSuggestionBar.hideSuggestion();
+            returnFocusToMainInput(); // So user can type in main text without closing keyboard
         }
 
         if (mInputLogic != null && mInputLogic.mConnection != null) {
@@ -1029,22 +1046,26 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // If in scan mode, replace the currently highlighted word and move to the next one.
         if (mIsScanMode && mCurrentMisspellingIndex >= 0 && mCurrentMisspellingIndex < mMisspellings.size()) {
             MisspellingInfo info = mMisspellings.get(mCurrentMisspellingIndex);
-
+            
             if (mInputLogic != null && mInputLogic.mConnection != null) {
                 final int originalLength = info.endPos - info.startPos;
                 final int absoluteWordStart = mScanBasePosition + mScanCumulativeDelta + info.startPos;
                 final int absoluteWordEnd = mScanBasePosition + mScanCumulativeDelta + info.endPos;
 
-                mInputLogic.mConnection.beginBatchEdit();
-                mInputLogic.mConnection.setSelection(absoluteWordStart, absoluteWordEnd);
-                mInputLogic.mConnection.deleteSelectedText();
-                mInputLogic.mConnection.commitText(suggestion, 1);
-                mInputLogic.mConnection.endBatchEdit();
-
+            mInputLogic.mConnection.beginBatchEdit();
+            mInputLogic.mConnection.setSelection(absoluteWordStart, absoluteWordEnd);
+            mInputLogic.mConnection.deleteSelectedText();
+            mInputLogic.mConnection.commitText(suggestion, 1);
+            mInputLogic.mConnection.endBatchEdit();
+            
                 // Track how much the text length changed so later indices stay correct.
                 final int delta = suggestion.length() - originalLength;
                 mScanCumulativeDelta += delta;
             }
+
+            // Increment counter for this correction in scan mode
+            TextReplacementManager manager = TextReplacementManager.getInstance(this);
+            manager.incrementCounter(info.word);
 
             // Advance to the next misspelling.
             mCurrentMisspellingIndex++;
@@ -1072,7 +1093,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         String lastWord = wordWithPunctuation[0];
         String punctuation = wordWithPunctuation[1];
         
-        if (lastWord != null && manager.getReplacement(lastWord) != null) {
+        String rawReplacement = lastWord != null ? manager.getReplacement(lastWord) : null;
+        if (rawReplacement != null) {
             // The suggestion may already include punctuation (from showSuggestion)
             // Extract just the word part if punctuation is present
             String suggestionWord = suggestion;
@@ -1084,8 +1106,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 }
             }
             
-            // Apply case matching to the suggestion word
-            String caseMatchedSuggestion = applyCaseMatching(lastWord, suggestionWord);
+            // If the stored correct value starts with ^, use the resolved form exactly (no case matching)
+            String caseMatchedSuggestion = resolveReplacement(lastWord, rawReplacement);
             
             // Delete the word and punctuation, replace with correct spelling
             int wordLength = lastWord.length();
@@ -1138,10 +1160,25 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mInputLogic.mConnection.commitText(caseMatchedSuggestion + punctuation + " ", 1);
             mInputLogic.mConnection.endBatchEdit();
             
+            // Increment counter for this correction
+            manager.incrementCounter(lastWord);
+            
             // Hide suggestion bar
             if (mSuggestionBar != null) {
                 mSuggestionBar.hideSuggestion();
             }
+        }
+    }
+
+    /**
+     * Deactivate the suggestion bar's correction input so that subsequent key presses
+     * go to the app's text field via the normal InputConnection path.
+     * This simply flips a manual flag and hides the EditText cursor; no Android focus
+     * juggling is needed because the IME window's focus tree is independent of the app's.
+     */
+    private void returnFocusToMainInput() {
+        if (mSuggestionBar != null) {
+            mSuggestionBar.clearCorrectionFocus();
         }
     }
 
@@ -1168,11 +1205,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 // Clear the EditText after processing
                 editText.setText("");
             }
-            // Return focus to app's text field
-            editText.clearFocus();
+            // Return focus to main input (keyboard) so user can keep typing in app's text field
+            returnFocusToMainInput();
             return;
         } else if (codePoint == Constants.CODE_DELETE) {
-            // Handle backspace
+            // If correction field is empty, return focus to main input so user can go back to typing
+            if (editText.getText().length() == 0) {
+                returnFocusToMainInput();
+                return;
+            }
+            // Handle backspace when field has content
             int start = editText.getSelectionStart();
             int end = editText.getSelectionEnd();
             if (start == end && start > 0) {
@@ -1309,6 +1351,24 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     /**
+     * Resolve raw replacement (may start with ^ for force-capitalize) and optionally apply case matching.
+     * When stored value starts with ^, returns resolved form as-is (exact case).
+     */
+    private String resolveReplacement(String originalWord, String rawReplacement) {
+        if (rawReplacement == null) {
+            return null;
+        }
+        String resolved = com.gkohn11.spellcheckkeyboard.latin.settings.TextReplacementManager.resolveCapitalizePrefix(rawReplacement);
+        if (rawReplacement.startsWith("^")) {
+            Log.d(TAG, "resolveReplacement: raw='" + rawReplacement + "' starts with ^, returning exact: '" + resolved + "'");
+            return resolved;
+        }
+        String caseMatched = applyCaseMatching(originalWord, resolved);
+        Log.d(TAG, "resolveReplacement: raw='" + rawReplacement + "', caseMatched='" + caseMatched + "'");
+        return caseMatched;
+    }
+
+    /**
      * Check for text replacement suggestions after text input
      * @param isSeparatorEvent true if this is called after a separator (space, etc.), false if after a character
      */
@@ -1322,6 +1382,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             if (!mSettings.getCurrent().mTextReplacementEnabled) {
                 // Text replacement is disabled - completely hide banner and return
                 mSuggestionBar.hideBanner();
+                return;
+            }
+            // Never show typed text in the suggestion bar for password fields
+            if (mSettings.getCurrent().mInputAttributes != null
+                    && mSettings.getCurrent().mInputAttributes.mIsPasswordField) {
+                mSuggestionBar.hideSuggestion();
                 return;
             }
         }
@@ -1344,10 +1410,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         String punctuation = wordWithPunctuation[1];
         
         // Always show the current word in the left column
-        String replacement = manager.getReplacement(lastWord);
-        if (replacement != null && !replacement.isEmpty()) {
-            // Apply case matching
-            String caseMatchedReplacement = applyCaseMatching(lastWord, replacement);
+        String rawReplacement = manager.getReplacement(lastWord);
+        if (rawReplacement != null && !rawReplacement.isEmpty()) {
+            // Resolve ^ prefix (force capitalize) and apply case matching when not forced
+            String caseMatchedReplacement = resolveReplacement(lastWord, rawReplacement);
             boolean isAlwaysOn = manager.isAlwaysOn(lastWord);
             
             // Only auto-replace when the separator is a space (not punctuation)
@@ -1402,6 +1468,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 }
                 mInputLogic.mConnection.commitText(textToCommit, 1);
                 mInputLogic.mConnection.endBatchEdit();
+                
+                // Increment counter for this auto-correction
+                manager.incrementCounter(lastWord);
+                
                 mSuggestionBar.hideSuggestion();
             } else {
                 // Show suggestion bar with case-matched replacement
@@ -1454,11 +1524,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             resetScan();
             return;
         }
-
+        
         // Initialize scan coordinates relative to the current editor contents.
         final int cursorPos = mInputLogic.mConnection.getExpectedSelectionStart();
         mScanBasePosition = cursorPos - textBeforeCursor.length();
         mScanCumulativeDelta = 0;
+        // Remember where the cursor was so we can restore it when scan ends.
+        mScanOriginalCursorPos = cursorPos;
 
         // Start scan mode at the first misspelling.
         mIsScanMode = true;
@@ -1473,18 +1545,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private void scanTextForMisspellings(String text) {
         mMisspellings.clear();
         TextReplacementManager manager = TextReplacementManager.getInstance(this);
-
+        
         if (text == null || text.isEmpty()) {
             return;
         }
-
+        
         // Walk the text from the beginning, extracting words and checking against the CSV.
         StringBuilder currentWord = new StringBuilder();
         int wordStart = -1;
-
+        
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-
+            
             if (Character.isLetterOrDigit(c)) {
                 if (wordStart == -1) {
                     wordStart = i;
@@ -1494,10 +1566,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 // End of word
                 if (currentWord.length() > 0) {
                     String word = currentWord.toString();
-                    String replacement = manager.getReplacement(word);
-                    if (replacement != null && !replacement.isEmpty()) {
-                        // Apply case matching once and store the final correction here.
-                        String caseMatched = applyCaseMatching(word, replacement);
+                    String rawReplacement = manager.getReplacement(word);
+                    if (rawReplacement != null && !rawReplacement.isEmpty()) {
+                        String caseMatched = resolveReplacement(word, rawReplacement);
                         mMisspellings.add(new MisspellingInfo(
                                 word,
                                 caseMatched,
@@ -1510,13 +1581,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 }
             }
         }
-
+        
         // Check last word if text doesn't end with punctuation
         if (currentWord.length() > 0 && wordStart >= 0) {
             String word = currentWord.toString();
-            String replacement = manager.getReplacement(word);
-            if (replacement != null && !replacement.isEmpty()) {
-                String caseMatched = applyCaseMatching(word, replacement);
+            String rawReplacement = manager.getReplacement(word);
+            if (rawReplacement != null && !rawReplacement.isEmpty()) {
+                String caseMatched = resolveReplacement(word, rawReplacement);
                 mMisspellings.add(new MisspellingInfo(
                         word,
                         caseMatched,
@@ -1538,17 +1609,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             resetScan();
             return;
         }
-
+        
         MisspellingInfo info = mMisspellings.get(mCurrentMisspellingIndex);
-
+        
         if (mInputLogic != null && mInputLogic.mConnection != null) {
             final int absoluteWordStart = mScanBasePosition + mScanCumulativeDelta + info.startPos;
             final int absoluteWordEnd = mScanBasePosition + mScanCumulativeDelta + info.endPos;
-
+        
             // Move cursor to select the misspelled word.
-            mInputLogic.mConnection.beginBatchEdit();
-            mInputLogic.mConnection.setSelection(absoluteWordStart, absoluteWordEnd);
-            mInputLogic.mConnection.endBatchEdit();
+        mInputLogic.mConnection.beginBatchEdit();
+        mInputLogic.mConnection.setSelection(absoluteWordStart, absoluteWordEnd);
+        mInputLogic.mConnection.endBatchEdit();
         }
 
         // Show suggestion for this word in the scan banner.
@@ -1563,19 +1634,29 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (!mIsScanMode || mMisspellings.isEmpty()) {
             return;
         }
-
-        mCurrentMisspellingIndex++;
+        
+            mCurrentMisspellingIndex++;
         showCurrentMisspelling();
     }
     
     /**
-     * Reset scan mode - clear state and hide suggestion bar
+     * Reset scan mode - restore cursor to its original position and hide suggestion bar.
+     * The original position is adjusted by the cumulative character delta from any
+     * replacements that were applied during the scan session.
      */
     private void resetScan() {
+        // Restore the cursor to where it was when the user pressed the scan button,
+        // adjusted for any text-length changes caused by replacements.
+        if (mScanOriginalCursorPos >= 0 && mInputLogic != null && mInputLogic.mConnection != null) {
+            final int restoredPos = mScanOriginalCursorPos + mScanCumulativeDelta;
+            mInputLogic.mConnection.setSelection(restoredPos, restoredPos);
+        }
+
         mIsScanMode = false;
         mCurrentMisspellingIndex = -1;
         mScanBasePosition = 0;
         mScanCumulativeDelta = 0;
+        mScanOriginalCursorPos = -1;
         mMisspellings.clear();
         if (mSuggestionBar != null) {
             mSuggestionBar.setScanMode(false);
@@ -1590,12 +1671,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (!mIsScanMode || mMisspellings.isEmpty()) {
             return;
         }
-
+        
         mCurrentMisspellingIndex--;
         if (mCurrentMisspellingIndex < 0) {
             mCurrentMisspellingIndex = 0;
         }
-
+        
         showCurrentMisspelling();
     }
 

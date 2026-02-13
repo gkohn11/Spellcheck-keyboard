@@ -125,7 +125,7 @@
     <string name="scan_button_enabled">Show scan button</string>
     <string name="scan_button_enabled_summary">Show button to scan and fix misspellings in typed text</string>
     <string name="long_press_for_numbers">Long press for numbers</string>
-    <string name="setup_message">Spellcheck Keyboard is not enabled. Click OK to open Languages &amp; Input settings. You will need to select Spellcheck Keyboard in your current keyboard to use it.</string>
+    <string name="setup_message">Simple Spellcheck is not enabled. Click OK to open Languages &amp; Input settings. You will need to select Simple Spellcheck in your current keyboard to use it.</string>
     <string name="user_languages">Enabled keyboard languages</string>
     <string name="add_language">Add language</string>
     <string name="remove_language">Remove language</string>
@@ -133,4 +133,60 @@
     <string name="change_keyboard">Change keyboard</string>
     <string name="privacy_policy">Privacy Policy</string>
     <string name="license">License</string>
+    <string name="send_feedback">Send Feedback</string>
+
+    <!-- Replace Text screen -->
+    <string name="tr_header_sel">Sel</string>
+    <string name="tr_header_misspell">Misspell</string>
+    <string name="tr_header_correct">Correct</string>
+    <string name="tr_header_auto">Auto</string>
+    <string name="tr_button_export">Export</string>
+    <string name="tr_button_search">Search</string>
+    <string name="tr_hint_misspell">Misspell</string>
+    <string name="tr_hint_correct">Correct</string>
+    <string name="tr_menu_clear_counter">Clear counter</string>
+    <string name="tr_menu_turn_off_counter">Turn off counter</string>
+    <string name="tr_menu_turn_on_counter">Turn on counter</string>
+    <string name="tr_menu_delete_unused">Delete unused</string>
+    <string name="tr_menu_delete_selected">Delete selected</string>
+    <string name="tr_menu_delete_all">Delete all</string>
+    <string name="tr_upload_csv_title">Upload CSV File</string>
+    <string name="tr_upload_csv_message">This will overwrite all current text replacement data. Are you sure you want to continue?</string>
+    <string name="tr_yes_upload">Yes, Upload</string>
+    <string name="tr_cancel">Cancel</string>
+    <string name="tr_delete_all_title">Delete All Entries</string>
+    <string name="tr_delete_all_message">This will permanently delete ALL text replacement entries. This action cannot be undone. Are you sure?</string>
+    <string name="tr_delete_all_btn">Delete All</string>
+    <string name="tr_delete_unused_title">Delete Unused</string>
+    <string name="tr_delete_unused_message_one">Delete 1 entry that has never been used (counter = 0)?</string>
+    <string name="tr_delete_unused_message_many">Delete %d entries that have never been used (counter = 0)?</string>
+    <string name="tr_delete_btn">Delete</string>
+    <string name="tr_no_unused_entries">No unused entries (counter 0) to delete</string>
+    <string name="tr_clear_counters_title">Clear All Counters</string>
+    <string name="tr_clear_counters_message">Reset all usage counters to zero?</string>
+    <string name="tr_clear_btn">Clear</string>
+    <string name="tr_saved_to_downloads">Saved to Downloads: %s</string>
+    <string name="tr_failed_export">Failed to export: %s</string>
+    <string name="tr_failed_share_csv">Failed to share CSV: %s</string>
+    <string name="tr_select_csv_file">Select CSV File</string>
+    <string name="tr_no_file_picker">No file picker available</string>
+    <string name="tr_please_select_csv">Please select a CSV file</string>
+    <string name="tr_failed_read_file">Failed to read file</string>
+    <string name="tr_no_valid_entries">No valid entries found in CSV file</string>
+    <string name="tr_imported_entries">Imported %d entries</string>
+    <string name="tr_failed_import">Failed to import CSV: %s</string>
+    <string name="tr_unused_deleted">Unused entries deleted</string>
+    <string name="tr_failed_delete_unused">Failed to delete unused entries</string>
+    <string name="tr_counters_cleared">Counters cleared</string>
+    <string name="tr_failed_clear_counters">Failed to clear counters</string>
+    <string name="tr_all_entries_deleted">All entries deleted</string>
+    <string name="tr_failed_delete_all">Failed to delete all entries: %s</string>
+    <string name="tr_no_matches_found">No matches found</string>
+    <string name="tr_search_status_of">%1$d of %2$d</string>
+    <string name="tr_search_title">Search</string>
+    <string name="tr_enter_search_term">Enter search term</string>
+    <string name="tr_previous">Previous</string>
+    <string name="tr_next">Next</string>
+    <string name="tr_share_csv_file">Share CSV File</string>
+    <string name="tr_text_replacements_export">Text Replacements Export</string>
 </resources>

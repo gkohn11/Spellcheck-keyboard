@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2025 Raimondas Rimkus
  * 
- * This file is part of Spellcheck Keyboard, a derivative work based on
+ * This file is part of Simple Spellcheck, a derivative work based on
  * Simple Keyboard (Copyright (C) 2025 Raimondas Rimkus and contributors)
  * which is based on AOSP LatinIME (Copyright (C) 2008 The Android Open Source Project).
  *
@@ -27,15 +27,21 @@ public class TextReplacementEntry {
     private String misspell;
     private String correct;
     private boolean alwaysOn;
+    private int counter;
 
     public TextReplacementEntry() {
-        this("", "", false);
+        this("", "", false, 0);
     }
 
     public TextReplacementEntry(String misspell, String correct, boolean alwaysOn) {
+        this(misspell, correct, alwaysOn, 0);
+    }
+
+    public TextReplacementEntry(String misspell, String correct, boolean alwaysOn, int counter) {
         this.misspell = misspell != null ? misspell : "";
         this.correct = correct != null ? correct : "";
         this.alwaysOn = alwaysOn;
+        this.counter = counter;
     }
 
     public String getMisspell() {
@@ -62,13 +68,26 @@ public class TextReplacementEntry {
         this.alwaysOn = alwaysOn;
     }
 
+    public int getCounter() {
+        return counter;
+    }
+
+    public void setCounter(int counter) {
+        this.counter = counter;
+    }
+
+    public void incrementCounter() {
+        this.counter++;
+    }
+
     /**
-     * Convert to CSV format: misspell,correct,alwaysOn
+     * Convert to CSV format: misspell,correct,alwaysOn,counter
      */
     public String toCsv() {
         return escapeCsvField(misspell) + "," + 
                escapeCsvField(correct) + "," + 
-               alwaysOn;
+               alwaysOn + "," +
+               counter;
     }
 
     /**
@@ -87,8 +106,16 @@ public class TextReplacementEntry {
         String misspell = unescapeCsvField(parts[0].trim());
         String correct = unescapeCsvField(parts[1].trim());
         boolean alwaysOn = "true".equalsIgnoreCase(parts[2].trim());
+        int counter = 0;
+        if (parts.length >= 4) {
+            try {
+                counter = Integer.parseInt(parts[3].trim());
+            } catch (NumberFormatException e) {
+                counter = 0;
+            }
+        }
 
-        return new TextReplacementEntry(misspell, correct, alwaysOn);
+        return new TextReplacementEntry(misspell, correct, alwaysOn, counter);
     }
 
     /**

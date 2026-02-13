@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2025 Raimondas Rimkus
  * 
- * This file is part of Spellcheck Keyboard, a derivative work based on
+ * This file is part of Simple Spellcheck, a derivative work based on
  * Simple Keyboard (Copyright (C) 2025 Raimondas Rimkus and contributors)
  * which is based on AOSP LatinIME (Copyright (C) 2008 The Android Open Source Project).
  *
@@ -195,7 +195,7 @@ public class TextReplacementCsvManager {
             writer = new OutputStreamWriter(fileOutputStream, StandardCharsets.UTF_8);
 
             // Write header
-            writer.write("Misspell,Correct,Always on?\n");
+            writer.write("Misspell,Correct,Always on?,Counter\n");
 
             // Write entries (filter out empty ones)
             int savedCount = 0;
